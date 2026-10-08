@@ -1,13 +1,13 @@
 {
-  "name": "compa",
+  "name": "allclear",
   "version": "0.1.0",
   "description": "Browser dashboard to monitor every active Claude Code session and approve their permission requests in one click.",
   "bin": {
-    "compa": "bin/compa.js"
+    "allclear": "bin/allclear.js"
   },
   "main": "src/server.js",
   "scripts": {
-    "start": "node bin/compa.js start"
+    "start": "node bin/allclear.js start"
   },
   "files": [
     "bin",

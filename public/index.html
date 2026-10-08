@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>compa</title>
+    <title>allclear</title>
     <link rel="icon" href="/logo.svg" />
     <link rel="stylesheet" href="/app.css" />
     <script>
       // Applied before first paint so the page never flashes the wrong theme.
       try {
-        var saved = localStorage.getItem('compa.theme');
+        var saved = localStorage.getItem('allclear.theme');
         if (saved === 'dark' || saved === 'light') {
           document.documentElement.dataset.theme = saved;
         }
@@ -27,7 +27,7 @@
           <rect x="2" y="22" width="14" height="6" rx="3" fill="#7b7b86" />
           <rect x="20" y="3" width="10" height="26" rx="5" fill="var(--accent)" />
         </svg>
-        <h1>compa</h1>
+        <h1>allclear</h1>
         <span id="conn" class="conn" data-state="connecting">connecting</span>
       </div>
 

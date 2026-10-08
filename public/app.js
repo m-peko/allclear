@@ -40,7 +40,7 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 // ------------------------------------------------------------------- theme
 
-const THEME_KEY = 'compa.theme';
+const THEME_KEY = 'allclear.theme';
 
 function readStore(key, fallback) {
   try {
@@ -79,7 +79,7 @@ el.theme.addEventListener('click', () => {
 // { default: {span, chatH}, bySession: { [id]: {span, chatH} } }
 // A resize updates both that card and the default, so the next session to appear
 // inherits the size you last chose rather than reverting.
-const SIZE_KEY = 'compa.cardSizes';
+const SIZE_KEY = 'allclear.cardSizes';
 const sizes = Object.assign({ default: null, bySession: {} }, readStore(SIZE_KEY, {}));
 
 function sizeFor(sessionId) {
@@ -514,7 +514,7 @@ function renderRequest(request) {
   const timer = countdown(request.expiresAt);
   const clock = node('span', `countdown${timer.urgent ? ' urgent' : ''}`, timer.text);
   clock.title =
-    'Time left before compa stops holding this request and Claude Code falls back to the terminal prompt.';
+    'Time left before allclear stops holding this request and Claude Code falls back to the terminal prompt.';
   clock.dataset.expires = String(request.expiresAt);
   head.append(clock);
   wrap.append(head);
@@ -731,7 +731,7 @@ function render() {
   el.approveAll.append(node('kbd', null, 'A'));
 
   el.autoApprove.checked = Boolean(state.autoApprove);
-  document.title = pendingCount ? `(${pendingCount}) compa` : 'compa';
+  document.title = pendingCount ? `(${pendingCount}) allclear` : 'allclear';
 
   // Remember where each chat pane was scrolled before the tree is replaced.
   el.sessions.querySelectorAll('.chat[data-session]').forEach((pane) => {
@@ -808,7 +808,7 @@ function notifyNew(next) {
   if (fresh.length && document.hidden && window.Notification?.permission === 'granted') {
     new Notification(`${fresh.length} permission request${fresh.length > 1 ? 's' : ''}`, {
       body: 'Claude Code is waiting for approval.',
-      tag: 'compa-pending',
+      tag: 'allclear-pending',
     });
   }
 }

@@ -10,5 +10,5 @@ module.exports = {
   SESSIONS_DIR: path.join(CLAUDE_DIR, 'sessions'),
   SETTINGS_FILE: path.join(CLAUDE_DIR, 'settings.json'),
   PUBLIC_DIR: path.join(__dirname, '..', 'public'),
-  DEFAULT_PORT: Number(process.env.COMPA_PORT || 4517),
+  DEFAULT_PORT: Number(process.env.ALLCLEAR_PORT || 4517),
 };

@@ -13,7 +13,7 @@ const transcript = require('./transcript');
 // hook with 600s). Release a little before that so the fallback is ours and
 // predictable: we answer with an empty body, which Claude Code reads as "no
 // decision" and falls through to the normal terminal prompt.
-const HOLD_MS = Number(process.env.COMPA_HOLD_MS || 540_000);
+const HOLD_MS = Number(process.env.ALLCLEAR_HOLD_MS || 540_000);
 const SCAN_INTERVAL_MS = 1000;
 const MAX_ACTIVITY = 60;
 
@@ -158,7 +158,7 @@ function createServer() {
     // card that moves while you are reading it is worse than one you have to
     // look for — a session that needs you is marked, not relocated.
     sessions.sort(
-      (a, b) => (a.startedAt || 0) - (b.startedAt || 0) || a.sessionId.localeCompare(b.sessionId)
+      (a, b) => (a.startedAt || 0) - (b.startedAt || 0) || a.sessionId.localeAllclearre(b.sessionId)
     );
 
     return {
@@ -262,7 +262,7 @@ function createServer() {
     return {
       hookSpecificOutput: {
         hookEventName: 'PermissionRequest',
-        decision: { behavior: 'deny', message: message || 'Denied from the compa dashboard.' },
+        decision: { behavior: 'deny', message: message || 'Denied from the allclear dashboard.' },
       },
     };
   }

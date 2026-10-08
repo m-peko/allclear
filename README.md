@@ -2,7 +2,7 @@
   <img src="docs/logo.svg" width="76" height="76" alt="">
 </p>
 
-<h1 align="center">compa</h1>
+<h1 align="center">allclear</h1>
 
 <p align="center">
   One browser tab for every Claude Code session you have running —<br>
@@ -17,13 +17,13 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="compa showing four sessions, two of them waiting for approval">
+  <img src="docs/screenshot.png" alt="allclear showing four sessions, two of them waiting for approval">
 </p>
 
 ---
 
 If you keep six terminals open and spend your day hunting for the one stuck on
-`Do you want to proceed?`, this is for you. compa puts every session in one page,
+`Do you want to proceed?`, this is for you. allclear puts every session in one page,
 shows you the command, diff or URL each one is waiting on, and lets you answer
 them all at once.
 
@@ -32,38 +32,51 @@ them all at once.
 Node 18 or newer. No dependencies, nothing to build.
 
 ```bash
-npx github:m-peko/compa
+npx github:m-peko/allclear
 ```
 
 That's it. It adds its hooks to `~/.claude/settings.json`, starts a local server
 and opens the dashboard. Sessions you already have open pick it up within
 seconds — no restart needed.
 
+Or install it properly, so `allclear` is just a command you have:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/m-peko/allclear/main/install.sh | sh
+```
+
+That puts the source in `~/.local/lib/allclear` and links `~/.local/bin/allclear`.
+It deliberately does **not** touch your Claude Code settings — running `allclear`
+afterwards does that — so piping it to a shell can't change how your sessions
+behave. Read it first if you'd rather:
+[`install.sh`](https://github.com/m-peko/allclear/blob/main/install.sh).
+Set `ALLCLEAR_PREFIX` to install somewhere else.
+
 <details>
 <summary>Other ways to install</summary>
 
-**Globally**, so you can just type `compa`:
+**With npm**, globally:
 
 ```bash
-npm install -g github:m-peko/compa
-compa
+npm install -g github:m-peko/allclear
+allclear
 ```
 
 **From a clone**, if you want to hack on it:
 
 ```bash
-git clone https://github.com/m-peko/compa.git
-cd compa
+git clone https://github.com/m-peko/allclear.git
+cd allclear
 npm link
-compa
+allclear
 ```
 
 </details>
 
-To remove it, run `compa uninstall` (or `npx github:m-peko/compa uninstall`).
+To remove it, run `allclear uninstall` (or `npx github:m-peko/allclear uninstall`).
 Your settings file is backed up to
-`~/.claude/settings.json.compa-backup-<timestamp>` before anything is written to
-it, and only compa's own hook entries are ever added or removed.
+`~/.claude/settings.json.allclear-backup-<timestamp>` before anything is written to
+it, and only allclear's own hook entries are ever added or removed.
 
 ## What you get
 
@@ -77,19 +90,19 @@ shell command, the real before/after of an edit, the URL being fetched. **Approv
 all** (or <kbd>A</kbd>) answers every one on screen — a bulk decision, not a blind
 one.
 
-**Nothing silently stuck.** Each request shows how long compa will hold it. Let it
-run out, or quit compa, and it falls back to the terminal prompt exactly as if
-compa had never been there.
+**Nothing silently stuck.** Each request shows how long allclear will hold it. Let it
+run out, or quit allclear, and it falls back to the terminal prompt exactly as if
+allclear had never been there.
 
 ## Commands
 
 | | |
 | :-- | :-- |
-| `compa` | Set up if needed, then open the dashboard |
-| `compa start` | Run the dashboard without touching your settings |
-| `compa install` | Add the hooks to `~/.claude/settings.json` |
-| `compa status` | Show hooks, live sessions, and whether the server is up |
-| `compa uninstall` | Remove the hooks |
+| `allclear` | Set up if needed, then open the dashboard |
+| `allclear start` | Run the dashboard without touching your settings |
+| `allclear install` | Add the hooks to `~/.claude/settings.json` |
+| `allclear status` | Show hooks, live sessions, and whether the server is up |
+| `allclear uninstall` | Remove the hooks |
 
 `--port N` runs on a different port — pass it to `install` as well, so the hooks
 point at the right place. `--no-open` skips opening a browser.
@@ -113,13 +126,13 @@ following your system setting until you pick one.
 
 Claude Code fires a [`PermissionRequest`](https://code.claude.com/docs/en/hooks)
 hook at the moment it is about to ask you to approve a tool call, and the hook's
-response decides the outcome. compa registers an HTTP hook pointing at its own
+response decides the outcome. allclear registers an HTTP hook pointing at its own
 local server:
 
 1. A session wants to run something that needs permission.
-2. Claude Code POSTs the request to compa and waits on the response.
+2. Claude Code POSTs the request to allclear and waits on the response.
 3. It appears in your browser, in full.
-4. You click. compa answers the open request, and the session carries on.
+4. You click. allclear answers the open request, and the session carries on.
 
 Because the decision rides on the hook response, there is no polling and no
 keystroke injection — this is the interface Claude Code provides for exactly this
@@ -129,23 +142,23 @@ Two smaller hooks fill the gaps: `Notification` surfaces the few prompts that
 never raise a `PermissionRequest`, such as a sandboxed command's network request,
 and `SessionEnd` clears a session's rows when it exits.
 
-### If compa isn't running
+### If allclear isn't running
 
 A failed connection to the hook is a non-blocking error in Claude Code: it simply
 carries on with its normal permission flow and prompts in the terminal. Stopping
-compa, or never starting it, changes nothing about how your sessions behave.
+allclear, or never starting it, changes nothing about how your sessions behave.
 
-The same applies to anything compa is still holding when you quit — every held
+The same applies to anything allclear is still holding when you quit — every held
 request is handed back to the terminal prompt on shutdown.
 
 ### Requests you answer in the terminal
 
 Claude Code shows its own prompt while the hook is still pending; whichever
 answers first wins. If you answer in the terminal it does **not** close the hook's
-connection, so compa has no direct way to learn the request is settled.
+connection, so allclear has no direct way to learn the request is settled.
 
 What gives it away is the session's own status. Claude Code reports `waiting`
-while a prompt is up and moves off it once the prompt is gone, so compa drops a
+while a prompt is up and moves off it once the prompt is gone, so allclear drops a
 held request when its session has stopped waiting — either because it watched the
 session enter `waiting` and leave it, or because the session has gone fully idle.
 A five-second grace period covers the lag. Those appear as `answered` in the
@@ -153,14 +166,14 @@ sidebar.
 
 ### Timeouts
 
-compa holds a request for 9 minutes (`COMPA_HOLD_MS`), just under the hook's
+allclear holds a request for 9 minutes (`ALLCLEAR_HOLD_MS`), just under the hook's
 10-minute timeout, then releases it to the terminal prompt. Each card shows the
 time remaining, so nothing is left waiting on a browser tab you closed.
 
 ### Finding your sessions
 
 Live sessions come from `~/.claude/sessions/*.json`, which Claude Code maintains
-per process. Those files are never cleaned up, so compa filters them: a record
+per process. Those files are never cleaned up, so allclear filters them: a record
 counts as live only if its pid exists **and** the process start time still matches
 the `procStart` recorded in the file, which rules out a recycled pid. On a machine
 with 131 session files, that typically leaves the 8 that are genuinely running.
@@ -179,7 +192,7 @@ real repository, so that suffix is stripped first and the badge reads
 
 Expanded cards show the tail of the session's transcript from
 `~/.claude/projects/<slug>/<id>.jsonl`. Those files routinely pass several
-megabytes, so compa never reads one whole — it seeks to the last 256KB, walks
+megabytes, so allclear never reads one whole — it seeks to the last 256KB, walks
 backwards until it has enough turns, and caches the result against the file's size
 and mtime. Subagent chatter and tool-result plumbing are filtered out.
 
