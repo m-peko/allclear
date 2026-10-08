@@ -8,16 +8,25 @@ If you keep eight terminals open and spend your day hunting for the one showing
 `Do you want to proceed?`, this is for you.
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ ● compa          live        8 sessions   3 waiting           │
-│                              [ Auto-approve ]  [ Approve all 3 ] │
-├──────────────────────────────────────────────────────────────┤
-│ ● api-server-8d  ~/work/api-server                3 waiting   │
-│   ┌ Bash  Reinstall dependencies              8:42 ─────────┐ │
-│   │ rm -rf node_modules && npm install                      │ │
-│   └ [Approve] [Always allow]              [Deny] ───────────┘ │
-└──────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────┬───────────────┐
+│ ● compa  live    8 sessions  3 active  2 waiting│ RECENT        │
+│                  [Auto-approve] [Approve all 2]│ DECISIONS     │
+├───────────────────────────────────────────────┤               │
+│ ▾ api-server-8d      ~/work/api-server   1 [OK]│ ALLOWED  api  │
+│   claude  Reinstalling to clear the lockfile…  │ Bash · pnpm…  │
+│   Bash    git status --porcelain               │               │
+│   ┌ Bash  Reinstall dependencies         8:42 ┐│ DENIED   web  │
+│   │ rm -rf node_modules && pnpm install       ││ Bash · curl…  │
+│   └ [Approve] [Always allow]        [Deny] ───┘│               │
+├───────────────────────────────────────────────┤ ALWAYS   api  │
+│ 5 IDLE                                         │ Edit · src/…  │
+│ › worker-12 ~/work/…  › docs-4a ~/work/…       │               │
+└───────────────────────────────────────────────┴───────────────┘
 ```
+
+Active sessions expand to show what they're doing — the recent conversation,
+the tool calls, and anything waiting on you. Idle sessions collapse to one-line
+tiles. Click any header to pin a card open or shut.
 
 ## Install
 
@@ -70,6 +79,21 @@ counts as live only if its pid exists **and** the process start time still match
 the `procStart` recorded in the file, which rules out a recycled pid. On a box with
 131 session files, that typically leaves the 8 or so that are genuinely running.
 
+A session counts as **active** — and so renders expanded — when it is busy, waiting
+on a prompt, or holding a permission request. Everything else collapses to a tile.
+
+### The conversation view
+
+Expanded cards show the tail of the session's transcript from
+`~/.claude/projects/<slug>/<id>.jsonl`: what you asked, what Claude said, and the
+tool calls in between. Those files routinely pass several megabytes, so compa never
+reads one whole — it seeks to the last 256KB, walks backwards until it has enough
+turns, and caches the result against the file's size and mtime. Subagent chatter and
+tool-result plumbing are filtered out so the thread stays readable.
+
+Transcripts are read from disk and sent to your own browser over localhost. They
+are not written to, and nothing leaves the machine.
+
 ### If compa isn't running
 
 A failed connection to the hook is a non-blocking error in Claude Code: it simply
@@ -94,7 +118,8 @@ time remaining. Nothing gets stuck waiting on a browser tab you closed.
 | `compa status` | Show hooks, live sessions, server state |
 | `compa uninstall` | Remove the hooks |
 
-Press <kbd>A</kbd> anywhere in the dashboard to approve everything.
+Press <kbd>A</kbd> anywhere in the dashboard to approve everything. Click a card
+header to expand or collapse that session.
 
 ## About approving everything
 

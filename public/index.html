@@ -17,11 +17,12 @@
 
       <div class="stats">
         <div class="stat"><strong id="stat-sessions">0</strong><span>sessions</span></div>
+        <div class="stat"><strong id="stat-active">0</strong><span>active</span></div>
         <div class="stat"><strong id="stat-pending">0</strong><span>waiting</span></div>
       </div>
 
       <div class="controls">
-        <label class="toggle" title="Approve every request the moment it arrives, without asking.">
+        <label class="toggle" title="Approve every request the moment it arrives, without showing it to you first.">
           <input type="checkbox" id="auto-approve" />
           <span class="track"><span class="thumb"></span></span>
           <span class="toggle-label">Auto-approve</span>
@@ -32,12 +33,15 @@
       </div>
     </header>
 
-    <main id="sessions" class="sessions"></main>
+    <div class="layout">
+      <main id="sessions" class="sessions"></main>
 
-    <section class="activity" id="activity-panel" hidden>
-      <h2>Recent decisions</h2>
-      <ul id="activity"></ul>
-    </section>
+      <aside class="sidebar">
+        <h2>Recent decisions</h2>
+        <ul id="activity" class="activity-list"></ul>
+        <p id="activity-empty" class="sidebar-empty">Nothing decided yet.</p>
+      </aside>
+    </div>
 
     <script src="/app.js"></script>
   </body>

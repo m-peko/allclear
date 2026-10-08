@@ -7,6 +7,7 @@ const crypto = require('crypto');
 
 const { PUBLIC_DIR, DEFAULT_PORT } = require('./paths');
 const sessionStore = require('./sessions');
+const transcript = require('./transcript');
 
 // Claude Code cancels an HTTP hook once its `timeout` elapses (we install the
 // hook with 600s). Release a little before that so the fallback is ours and
@@ -104,10 +105,21 @@ function createServer() {
 
     const sessions = [];
     for (const session of liveSessions.values()) {
+      const requests = (bySession.get(session.sessionId) || []).sort(
+        (a, b) => a.createdAt - b.createdAt
+      );
+      const notice = notices.get(session.sessionId) || null;
+      // Expanded cards show the conversation; collapsed ones don't need it, and
+      // skipping them keeps the broadcast small.
+      const active = Boolean(
+        requests.length || notice || session.status === 'busy' || session.status === 'waiting'
+      );
       sessions.push({
         ...session,
-        notice: notices.get(session.sessionId) || null,
-        pending: (bySession.get(session.sessionId) || []).sort((a, b) => a.createdAt - b.createdAt),
+        notice,
+        active,
+        pending: requests,
+        messages: active ? transcript.read(session.sessionId, 10) : null,
       });
     }
 
@@ -129,7 +141,9 @@ function createServer() {
         updatedAt: requests[0].createdAt,
         detached: true,
         notice: null,
+        active: true,
         pending: requests,
+        messages: transcript.read(sessionId, 10),
       });
     }
 
@@ -407,6 +421,14 @@ function createServer() {
 
         case 'GET /api/state':
           return sendJson(res, 200, snapshot());
+
+        // Used when someone expands a collapsed card by hand: that session's
+        // conversation isn't carried in the broadcast.
+        case 'GET /api/transcript': {
+          const sessionId = url.searchParams.get('sessionId') || '';
+          if (!/^[\w-]{1,128}$/.test(sessionId)) return sendJson(res, 400, { ok: false });
+          return sendJson(res, 200, { sessionId, messages: transcript.read(sessionId, 10) });
+        }
 
         case 'GET /api/stream': {
           res.writeHead(200, {

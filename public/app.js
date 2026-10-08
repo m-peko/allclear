@@ -1,23 +1,33 @@
 'use strict';
 
-// Everything rendered here comes from tool inputs of live Claude Code sessions.
-// It is built with createElement/textContent only — never innerHTML — so a tool
-// argument containing markup can't execute in the dashboard.
+// Everything rendered here comes from tool inputs and transcripts of live Claude
+// Code sessions. It is built with createElement/textContent only — never
+// innerHTML — so content from a tool argument can't execute in the dashboard.
 
 const el = {
   sessions: document.getElementById('sessions'),
   statSessions: document.getElementById('stat-sessions'),
+  statActive: document.getElementById('stat-active'),
   statPending: document.getElementById('stat-pending'),
   approveAll: document.getElementById('approve-all'),
   autoApprove: document.getElementById('auto-approve'),
   conn: document.getElementById('conn'),
-  activityPanel: document.getElementById('activity-panel'),
   activity: document.getElementById('activity'),
+  activityEmpty: document.getElementById('activity-empty'),
 };
 
 let state = { sessions: [], pendingCount: 0, autoApprove: false, activity: [] };
 let seenRequestIds = new Set();
-let busyIds = new Set();
+const busyIds = new Set();
+
+// Manual collapse/expand overrides, keyed by session id. Absent means "follow
+// whatever the session is doing".
+const overrides = new Map();
+// Transcripts for sessions the server doesn't ship chat for (collapsed ones the
+// user expanded by hand).
+const fetchedChats = new Map();
+// Remembered scroll position per chat pane, so re-renders don't jump.
+const chatScroll = new Map();
 
 // ------------------------------------------------------------------ helpers
 
@@ -47,9 +57,15 @@ function relTime(ms) {
 
 function countdown(expiresAt) {
   const left = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
-  const m = Math.floor(left / 60);
-  const s = left % 60;
-  return { text: `${m}:${String(s).padStart(2, '0')}`, urgent: left < 60 };
+  return {
+    text: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`,
+    urgent: left < 60,
+  };
+}
+
+function isExpanded(session) {
+  const override = overrides.get(session.sessionId);
+  return override === undefined ? Boolean(session.active) : override;
 }
 
 // ------------------------------------------------------- tool input rendering
@@ -130,7 +146,7 @@ async function post(path, body) {
 function decide(id, behavior, remember) {
   if (busyIds.has(id)) return;
   busyIds.add(id);
-  render(); // grey the row out immediately; the SSE push removes it
+  render();
   post('/api/decide', { id, behavior, remember }).finally(() => busyIds.delete(id));
 }
 
@@ -140,9 +156,27 @@ function approveAll(sessionId) {
   );
   ids.forEach((id) => busyIds.add(id));
   render();
-  post('/api/approve-all', sessionId ? { sessionId } : {}).finally(() => {
-    ids.forEach((id) => busyIds.delete(id));
-  });
+  post('/api/approve-all', sessionId ? { sessionId } : {}).finally(() =>
+    ids.forEach((id) => busyIds.delete(id))
+  );
+}
+
+async function loadChat(sessionId) {
+  try {
+    const res = await fetch(`/api/transcript?sessionId=${encodeURIComponent(sessionId)}`);
+    const data = await res.json();
+    fetchedChats.set(sessionId, data.messages || []);
+    render();
+  } catch {
+    /* the pane just stays empty */
+  }
+}
+
+function toggle(session) {
+  const next = !isExpanded(session);
+  overrides.set(session.sessionId, next);
+  if (next && !session.messages) loadChat(session.sessionId);
+  render();
 }
 
 el.approveAll.addEventListener('click', () => approveAll(null));
@@ -164,14 +198,42 @@ el.autoApprove.addEventListener('change', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
-  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName);
-  if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
-  if (event.key === 'a' || event.key === 'A') {
-    if (state.pendingCount > 0) approveAll(null);
-  }
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) return;
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+  if ((event.key === 'a' || event.key === 'A') && state.pendingCount > 0) approveAll(null);
 });
 
 // ------------------------------------------------------------------ rendering
+
+function renderChat(session) {
+  const messages = session.messages || fetchedChats.get(session.sessionId) || [];
+  const chat = node('div', 'chat');
+  chat.dataset.session = session.sessionId;
+
+  if (!messages.length) {
+    chat.append(node('div', 'chat-empty', 'No conversation yet.'));
+    return chat;
+  }
+
+  for (const message of messages) {
+    if (message.role === 'tool') {
+      const row = node('div', 'msg msg-tool');
+      row.append(node('span', 'tname', message.tool));
+      const arg = node('span', 'targ', String(message.text || '').replace(/\s+/g, ' '));
+      arg.title = message.text || '';
+      row.append(arg);
+      chat.append(row);
+      continue;
+    }
+
+    const wrap = node('div', `msg msg-${message.role}`);
+    wrap.append(node('div', 'who', message.role === 'user' ? 'you' : 'claude'));
+    wrap.append(node('div', null, message.text));
+    chat.append(wrap);
+  }
+
+  return chat;
+}
 
 function renderRequest(request) {
   const wrap = node('div', 'req');
@@ -179,12 +241,12 @@ function renderRequest(request) {
 
   const head = node('div', 'req-head');
   head.append(node('span', 'tool', request.toolName));
-  if (summary) head.append(node('span', 'req-desc', summary));
-  else head.append(node('span', 'req-desc'));
+  head.append(node('span', 'req-desc', summary || ''));
 
   const timer = countdown(request.expiresAt);
   const clock = node('span', `countdown${timer.urgent ? ' urgent' : ''}`, timer.text);
-  clock.title = 'Time left before compa stops holding this request and Claude Code falls back to the terminal prompt.';
+  clock.title =
+    'Time left before compa stops holding this request and Claude Code falls back to the terminal prompt.';
   clock.dataset.expires = String(request.expiresAt);
   head.append(clock);
   wrap.append(head);
@@ -225,22 +287,37 @@ function renderRequest(request) {
 }
 
 function renderSession(session) {
-  const card = node('div', `card${session.pending.length ? ' has-pending' : ''}`);
+  const expanded = isExpanded(session);
+  const classes = ['card'];
+  if (expanded) classes.push('expanded');
+  if (session.pending.length) classes.push('pending');
+  const card = node('div', classes.join(' '));
 
   const head = node('div', 'card-head');
+  head.addEventListener('click', (event) => {
+    if (event.target.closest('button')) return; // header buttons act on their own
+    toggle(session);
+  });
+
+  head.append(node('span', 'chev', '›'));
+
   const status = session.pending.length ? 'waiting' : session.status;
   const dot = node('span', `dot ${status}`);
   dot.title = status;
   head.append(dot);
-  head.append(node('span', 'card-name', session.name));
+
+  const name = node('span', 'card-name', session.name);
+  name.title = session.sessionId;
+  head.append(name);
 
   const meta = node('span', 'card-meta', shortPath(session.cwd));
   meta.title = session.cwd;
   head.append(meta);
 
   if (session.pending.length) {
-    head.append(node('span', 'badge hot', `${session.pending.length} waiting`));
-    const approve = node('button', 'btn btn-allow', 'Approve these');
+    head.append(node('span', 'badge hot', String(session.pending.length)));
+    const approve = node('button', 'btn btn-sm btn-allow', 'Approve');
+    approve.title = 'Approve every request from this session';
     approve.addEventListener('click', () => approveAll(session.sessionId));
     head.append(approve);
   } else {
@@ -248,18 +325,21 @@ function renderSession(session) {
   }
 
   card.append(head);
-  session.pending.forEach((request) => card.append(renderRequest(request)));
 
-  if (session.notice) {
-    const notice = node('div', 'notice', session.notice.message);
-    notice.append(
-      node(
-        'small',
-        null,
-        'Claude Code reported this prompt but it cannot be answered from here — switch to that terminal.'
-      )
-    );
-    card.append(notice);
+  if (expanded) {
+    card.append(renderChat(session));
+    session.pending.forEach((request) => card.append(renderRequest(request)));
+    if (session.notice) {
+      const notice = node('div', 'notice', session.notice.message);
+      notice.append(
+        node(
+          'small',
+          null,
+          'Claude Code reported this prompt but it cannot be answered from here — switch to that terminal.'
+        )
+      );
+      card.append(notice);
+    }
   }
 
   return card;
@@ -267,11 +347,7 @@ function renderSession(session) {
 
 function renderActivity() {
   el.activity.replaceChildren();
-  if (!state.activity.length) {
-    el.activityPanel.hidden = true;
-    return;
-  }
-  el.activityPanel.hidden = false;
+  el.activityEmpty.hidden = state.activity.length > 0;
 
   for (const entry of state.activity) {
     const li = node('li');
@@ -285,19 +361,26 @@ function renderActivity() {
         : entry.behavior === 'deny'
           ? 'denied'
           : 'released';
+
     li.append(node('span', `verb ${entry.behavior}`, verb));
     li.append(node('span', 'who', entry.sessionName || ''));
+
     const { summary } = describeTool(entry.toolName, entry.toolInput);
-    li.append(node('span', 'what', `${entry.toolName}${summary ? ` · ${summary}` : ''}`));
-    li.append(node('span', 'who', relTime(entry.at)));
+    const what = node('span', 'what', `${entry.toolName}${summary ? ` · ${summary}` : ''}`);
+    what.title = summary || entry.toolName;
+    li.append(what);
+
+    li.append(node('span', 'when', relTime(entry.at)));
     el.activity.append(li);
   }
 }
 
 function render() {
   const pendingCount = state.pendingCount || 0;
+  const activeCount = state.sessions.filter((s) => s.active).length;
 
   el.statSessions.textContent = String(state.sessions.length);
+  el.statActive.textContent = String(activeCount);
   el.statPending.textContent = String(pendingCount);
   el.statPending.parentElement.classList.toggle('hot', pendingCount > 0);
 
@@ -308,20 +391,39 @@ function render() {
   el.approveAll.append(node('kbd', null, 'A'));
 
   el.autoApprove.checked = Boolean(state.autoApprove);
-
   document.title = pendingCount ? `(${pendingCount}) compa` : 'compa';
 
+  // Remember where each chat pane was scrolled before the tree is replaced.
+  el.sessions.querySelectorAll('.chat[data-session]').forEach((pane) => {
+    chatScroll.set(pane.dataset.session, {
+      top: pane.scrollTop,
+      atBottom: pane.scrollHeight - pane.scrollTop - pane.clientHeight < 24,
+    });
+  });
+
   el.sessions.replaceChildren();
+
   if (!state.sessions.length) {
     const empty = node('div', 'empty');
     empty.append(node('strong', null, 'No Claude Code sessions running'));
-    empty.append(
-      node('span', null, 'Start a session and it will appear here within a second.')
-    );
+    empty.append(node('span', null, 'Start a session and it will appear here within a second.'));
     el.sessions.append(empty);
   } else {
-    state.sessions.forEach((session) => el.sessions.append(renderSession(session)));
+    const expanded = state.sessions.filter(isExpanded);
+    const collapsed = state.sessions.filter((s) => !isExpanded(s));
+
+    expanded.forEach((session) => el.sessions.append(renderSession(session)));
+    if (expanded.length && collapsed.length) {
+      el.sessions.append(node('div', 'group-label', `${collapsed.length} idle`));
+    }
+    collapsed.forEach((session) => el.sessions.append(renderSession(session)));
   }
+
+  // Restore scroll: panes already at the bottom stay pinned to new output.
+  el.sessions.querySelectorAll('.chat[data-session]').forEach((pane) => {
+    const saved = chatScroll.get(pane.dataset.session);
+    pane.scrollTop = !saved || saved.atBottom ? pane.scrollHeight : saved.top;
+  });
 
   renderActivity();
 }
@@ -334,6 +436,13 @@ setInterval(() => {
     element.classList.toggle('urgent', timer.urgent);
   });
 }, 1000);
+
+// Refresh transcripts for collapsed sessions the user pinned open.
+setInterval(() => {
+  for (const session of state.sessions) {
+    if (isExpanded(session) && !session.messages) loadChat(session.sessionId);
+  }
+}, 4000);
 
 // --------------------------------------------------------------- live updates
 
@@ -376,7 +485,6 @@ function connect() {
 }
 
 if (window.Notification && Notification.permission === 'default') {
-  // Asked on the first click rather than on load, so the browser honours it.
   document.addEventListener('click', () => Notification.requestPermission(), { once: true });
 }
 
