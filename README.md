@@ -37,7 +37,7 @@ A card has three states and they are separate gestures:
 
 | | |
 | :-- | :-- |
-| Click the header | Folds the card shut where it is, still on the grid |
+| Click the header | Folds the card shut where it is, keeping its width and place |
 | Click the **×** | Takes it off the grid; it waits in the sidebar |
 | Click a sidebar row | Puts it back on the grid, open |
 

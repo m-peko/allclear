@@ -235,6 +235,30 @@ function node(tag, className, text) {
   return n;
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// Stroked icons on a fixed 16-unit grid. Glyphs like › and × sit on a text
+// baseline and refuse to centre against each other; two identical boxes do.
+function icon(paths) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of paths) {
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.append(path);
+  }
+  return svg;
+}
+
+const CHEVRON = ['M6 3.5 L10.5 8 L6 12.5'];
+const CROSS = ['M4.2 4.2 L11.8 11.8', 'M11.8 4.2 L4.2 11.8'];
+
 function truncate(value, max = 4000) {
   const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2) ?? '';
   return text.length > max ? `${text.slice(0, max)}\n… ${text.length - max} more characters` : text;
@@ -542,10 +566,10 @@ function renderSession(session, columnCount) {
   if (session.pending.length) classes.push('pending');
   const card = node('div', classes.join(' '));
 
-  // A folded card is just a header bar, so it keeps one column; the remembered
-  // width belongs to the open card.
+  // Folding changes a card's height, not its place in the row, so the
+  // remembered width applies whether it is open or shut.
   const size = sizeFor(session.sessionId);
-  if (expanded && size && size.span) {
+  if (size && size.span) {
     card.style.gridColumn = `span ${clamp(size.span, 1, columnCount)}`;
   }
 
@@ -555,7 +579,10 @@ function renderSession(session, columnCount) {
     toggleCollapse(session);
   });
 
-  head.append(node('span', 'chev', '›'));
+  const chev = node('span', 'chev');
+  chev.append(icon(CHEVRON));
+  chev.title = expanded ? 'Fold this card' : 'Open this card';
+  head.append(chev);
 
   const status = session.pending.length ? 'waiting' : session.status;
   const dot = node('span', `dot ${status}`);
@@ -583,7 +610,8 @@ function renderSession(session, columnCount) {
     head.append(node('span', 'badge', session.status));
   }
 
-  const close = node('button', 'close-btn', '×');
+  const close = node('button', 'close-btn');
+  close.append(icon(CROSS));
   close.title = 'Remove from the grid (stays in the sidebar)';
   close.setAttribute('aria-label', 'Remove from grid');
   close.addEventListener('click', (event) => {

@@ -491,7 +491,8 @@ kbd {
   overflow: hidden;
 }
 
-.card.expanded {
+/* The default width, for open and folded cards alike. */
+.card {
   grid-column: span 2;
 }
 
@@ -517,16 +518,37 @@ kbd {
   border-bottom: 1px solid var(--line-soft);
 }
 
-.chev {
+/* The chevron and the × are the two controls on the header bar, one at each
+   end. Giving them the same box makes them line up with each other by
+   construction, whatever the title's line height does. */
+.chev,
+.close-btn {
   flex: none;
-  width: 10px;
-  color: var(--faint);
-  font-size: 10px;
-  transition: transform 0.15s;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+}
+
+.chev svg,
+.close-btn svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.chev {
+  color: var(--muted);
+  transition: transform 0.15s, color 0.12s;
 }
 
 .card.expanded .chev {
   transform: rotate(90deg);
+}
+
+.card-head:hover .chev {
+  color: var(--text);
 }
 
 .dot {
@@ -593,21 +615,15 @@ kbd {
 }
 
 .close-btn {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
   padding: 0;
-  font-size: 15px;
-  line-height: 1;
-  color: var(--faint);
+  color: var(--muted);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 5px;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.12s, color 0.12s, background 0.12s;
+  /* Legible at rest rather than appearing only on hover, so it reads as part of
+     the header instead of something you have to go hunting for. */
+  opacity: 0.6;
+  transition: opacity 0.12s, color 0.12s, background 0.12s, border-color 0.12s;
 }
 
 .card:hover .close-btn,
