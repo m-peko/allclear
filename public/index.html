@@ -19,11 +19,13 @@
   <body>
     <header class="topbar">
       <div class="brand">
+        <!-- See docs/logo.svg. Inline so the bar can take the theme's accent:
+             amber is nearly invisible on the light background. -->
         <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
-          <rect x="10" y="2" width="20" height="20" rx="5.5" fill="#8a8a95" opacity=".38" />
-          <rect x="2" y="10" width="20" height="20" rx="5.5" fill="var(--accent)" />
-          <path d="M6.8 20.4l3.4 3.4 6.9-7.2" fill="none" stroke="var(--accent-ink)"
-                stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round" />
+          <rect x="2" y="4" width="14" height="6" rx="3" fill="#7b7b86" />
+          <rect x="2" y="13" width="14" height="6" rx="3" fill="#7b7b86" />
+          <rect x="2" y="22" width="14" height="6" rx="3" fill="#7b7b86" />
+          <rect x="20" y="3" width="10" height="26" rx="5" fill="var(--accent)" />
         </svg>
         <h1>compa</h1>
         <span id="conn" class="conn" data-state="connecting">connecting</span>

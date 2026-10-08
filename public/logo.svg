@@ -1,9 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="compa">
-  <!-- Two stacked cards: many sessions. The check on the front one: approved.
-       The back card is neutral grey, never a tint of the accent — tinted amber
-       at low alpha turns muddy brown on a dark background. -->
-  <rect x="10" y="2" width="20" height="20" rx="5.5" fill="#8a8a95" opacity=".38" />
-  <rect x="2" y="10" width="20" height="20" rx="5.5" fill="#f5a524" />
-  <path d="M6.8 20.4l3.4 3.4 6.9-7.2" fill="none" stroke="#0a0a0c" stroke-width="3.1"
-        stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Three equal rows — the sessions, all waiting on the same thing — resolved
+       by one bar spanning all of them: the single point of control.
+
+       Every shape is a full-opacity solid at least 2px wide at favicon size.
+       The previous mark carried its "many sessions" idea in a low-alpha square
+       behind the main one, which at 16px computed to a dark grey smudge and read
+       as a drop shadow, losing the whole idea at the size it is seen most.
+
+       #7b7b86 is the neutral because it weighs about the same on both themes
+       (4.78:1 on #08080a, 3.88:1 on #f6f6f8); amber is 9.81:1 on the dark
+       background but only 1.89:1 on the light one, so it can never carry a shape
+       by itself. -->
+  <rect x="2" y="4" width="14" height="6" rx="3" fill="#7b7b86"/>
+  <rect x="2" y="13" width="14" height="6" rx="3" fill="#7b7b86"/>
+  <rect x="2" y="22" width="14" height="6" rx="3" fill="#7b7b86"/>
+  <rect x="20" y="3" width="10" height="26" rx="5" fill="#f5a524"/>
 </svg>

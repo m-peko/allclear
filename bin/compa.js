@@ -11,7 +11,23 @@ const { createServer } = require('../src/server');
 const COMPA_HOOK_URL = /^https?:\/\/127\.0\.0\.1:\d+\/hook\//;
 
 const args = process.argv.slice(2);
-const command = args.find((a) => !a.startsWith('-')) || 'setup';
+
+// Flags that consume the token after them, so `compa --port 4596` doesn't mistake
+// 4596 for the command name.
+const VALUE_FLAGS = new Set(['--port']);
+
+function parseCommand(argv) {
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i].startsWith('-')) {
+      if (VALUE_FLAGS.has(argv[i])) i += 1;
+      continue;
+    }
+    return argv[i];
+  }
+  return 'setup';
+}
+
+const command = parseCommand(args);
 
 function flag(name) {
   return args.includes(`--${name}`);
