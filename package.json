@@ -1,0 +1,28 @@
+{
+  "name": "compa",
+  "version": "0.1.0",
+  "description": "Browser dashboard to monitor every active Claude Code session and approve their permission requests in one click.",
+  "bin": {
+    "compa": "bin/compa.js"
+  },
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node bin/compa.js start"
+  },
+  "files": [
+    "bin",
+    "src",
+    "public",
+    "README.md"
+  ],
+  "keywords": [
+    "claude-code",
+    "hooks",
+    "permissions",
+    "dashboard"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>compa</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23e6a23c'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11.5' stroke='%23161616' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <h1>compa</h1>
+        <span id="conn" class="conn" data-state="connecting">connecting</span>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><strong id="stat-sessions">0</strong><span>sessions</span></div>
+        <div class="stat"><strong id="stat-pending">0</strong><span>waiting</span></div>
+      </div>
+
+      <div class="controls">
+        <label class="toggle" title="Approve every request the moment it arrives, without asking.">
+          <input type="checkbox" id="auto-approve" />
+          <span class="track"><span class="thumb"></span></span>
+          <span class="toggle-label">Auto-approve</span>
+        </label>
+        <button id="approve-all" class="btn btn-primary btn-lg" disabled>
+          Approve all <kbd>A</kbd>
+        </button>
+      </div>
+    </header>
+
+    <main id="sessions" class="sessions"></main>
+
+    <section class="activity" id="activity-panel" hidden>
+      <h2>Recent decisions</h2>
+      <ul id="activity"></ul>
+    </section>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
