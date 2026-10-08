@@ -28,6 +28,12 @@ Active sessions expand to show what they're doing — the recent conversation,
 the tool calls, and anything waiting on you. Idle sessions collapse to one-line
 tiles. Click any header to pin a card open or shut.
 
+Drag the corner of a card to resize it: sideways snaps it across grid columns,
+downwards grows its conversation pane. Sizes are remembered per session and the
+last size you picked becomes the default for cards that appear later.
+Double-click the corner to reset one. Dark and light themes are in the top bar,
+following your system setting until you pick one.
+
 ## Install
 
 Requires Node 18+. No dependencies.
@@ -82,6 +88,12 @@ the `procStart` recorded in the file, which rules out a recycled pid. On a box w
 A session counts as **active** — and so renders expanded — when it is busy, waiting
 on a prompt, or holding a permission request. Everything else collapses to a tile.
 
+Cards are ordered by when their session started, which never changes while it
+runs, so the grid doesn't reshuffle underneath you: cards expand and collapse in
+place, and a session that needs you is marked rather than moved. Sessions flip
+between busy and idle constantly, so a card that was active stays open for 30
+seconds after it settles instead of flapping shut.
+
 ### The conversation view
 
 Expanded cards show the tail of the session's transcript from
@@ -93,6 +105,20 @@ tool-result plumbing are filtered out so the thread stays readable.
 
 Transcripts are read from disk and sent to your own browser over localhost. They
 are not written to, and nothing leaves the machine.
+
+### Requests you answer in the terminal
+
+Claude Code shows its own prompt while the hook is still pending — whichever
+answers first wins. If you answer in the terminal, it does **not** close the
+hook's connection, so compa has no direct way to learn the request is settled and
+the card would sit there forever.
+
+What gives it away is the session's own status. Claude Code reports `waiting`
+while a prompt is up and moves off it once the prompt is gone, so compa drops a
+held request when its session has stopped waiting — either because it watched the
+session enter `waiting` and leave it, or because the session has gone fully idle.
+A five-second grace period covers the lag between the hook firing and the status
+catching up. Those show up as `answered` in the sidebar.
 
 ### If compa isn't running
 

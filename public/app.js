@@ -11,6 +11,7 @@ const el = {
   statPending: document.getElementById('stat-pending'),
   approveAll: document.getElementById('approve-all'),
   autoApprove: document.getElementById('auto-approve'),
+  theme: document.getElementById('theme'),
   conn: document.getElementById('conn'),
   activity: document.getElementById('activity'),
   activityEmpty: document.getElementById('activity-empty'),
@@ -28,6 +29,142 @@ const overrides = new Map();
 const fetchedChats = new Map();
 // Remembered scroll position per chat pane, so re-renders don't jump.
 const chatScroll = new Map();
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+// ------------------------------------------------------------------- theme
+
+const THEME_KEY = 'compa.theme';
+
+function readStore(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStore(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* private mode or blocked storage: sizing just won't persist */
+  }
+}
+
+function activeTheme() {
+  const set = document.documentElement.dataset.theme;
+  if (set === 'dark' || set === 'light') return set;
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+el.theme.addEventListener('click', () => {
+  const next = activeTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {
+    /* ignore */
+  }
+});
+
+// -------------------------------------------------------------- card sizing
+
+// { default: {span, chatH}, bySession: { [id]: {span, chatH} } }
+// A resize updates both that card and the default, so the next session to appear
+// inherits the size you last chose rather than reverting.
+const SIZE_KEY = 'compa.cardSizes';
+const sizes = Object.assign({ default: null, bySession: {} }, readStore(SIZE_KEY, {}));
+
+function sizeFor(sessionId) {
+  return sizes.bySession[sessionId] || sizes.default || null;
+}
+
+function rememberSize(sessionId, size) {
+  sizes.bySession[sessionId] = size;
+  sizes.default = size;
+
+  const keys = Object.keys(sizes.bySession);
+  if (keys.length > 200) delete sizes.bySession[keys[0]];
+  writeStore(SIZE_KEY, sizes);
+}
+
+function forgetSize(sessionId) {
+  delete sizes.bySession[sessionId];
+  writeStore(SIZE_KEY, sizes);
+}
+
+// Columns are equal in an auto-fill grid, so one stride covers them all.
+function gridMetrics() {
+  const style = getComputedStyle(el.sessions);
+  const columns = style.gridTemplateColumns.split(' ').filter(Boolean).map(parseFloat);
+  const gap = parseFloat(style.columnGap) || 0;
+  return { count: Math.max(1, columns.length), stride: (columns[0] || 300) + gap, gap };
+}
+
+let resizing = null;
+let renderQueued = false;
+
+function beginResize(event, card, session) {
+  event.preventDefault();
+  event.stopPropagation(); // the header's click handler must not toggle the card
+
+  const chat = card.querySelector('.chat');
+  const { count, stride, gap } = gridMetrics();
+
+  resizing = {
+    sessionId: session.sessionId,
+    startX: event.clientX,
+    startY: event.clientY,
+    startWidth: card.offsetWidth,
+    startChatH: chat ? chat.offsetHeight : 0,
+    result: { ...(sizeFor(session.sessionId) || {}) },
+    card,
+    chat,
+    count,
+    stride,
+    gap,
+  };
+
+  card.classList.add('resizing');
+  document.body.classList.add('resizing');
+  window.addEventListener('pointermove', onResizeMove);
+  window.addEventListener('pointerup', endResize, { once: true });
+  window.addEventListener('pointercancel', endResize, { once: true });
+}
+
+function onResizeMove(event) {
+  if (!resizing) return;
+  const { card, chat, stride, gap, count } = resizing;
+
+  // A card spanning n columns is n*stride - gap wide, so invert that for n.
+  const width = resizing.startWidth + (event.clientX - resizing.startX);
+  const span = clamp(Math.round((width + gap) / stride), 1, count);
+  card.style.gridColumn = `span ${span}`;
+  resizing.result.span = span;
+
+  if (chat) {
+    const height = clamp(resizing.startChatH + (event.clientY - resizing.startY), 110, 1200);
+    chat.style.height = `${height}px`;
+    resizing.result.chatH = height;
+  }
+}
+
+function endResize() {
+  if (!resizing) return;
+  const { card, sessionId, result } = resizing;
+
+  card.classList.remove('resizing');
+  document.body.classList.remove('resizing');
+  window.removeEventListener('pointermove', onResizeMove);
+  rememberSize(sessionId, result);
+  resizing = null;
+
+  if (renderQueued) {
+    renderQueued = false;
+    render();
+  }
+}
 
 // ------------------------------------------------------------------ helpers
 
@@ -63,9 +200,25 @@ function countdown(expiresAt) {
   };
 }
 
+// Sessions flip between busy and idle constantly while they work. Expanding and
+// collapsing on every flip would make the grid twitch, so a card that was active
+// stays open for a while after it settles.
+const STICKY_MS = 30_000;
+const activeSince = new Map();
+
+function noteActivity() {
+  const now = Date.now();
+  for (const session of state.sessions) {
+    if (session.active) activeSince.set(session.sessionId, now);
+  }
+}
+
 function isExpanded(session) {
   const override = overrides.get(session.sessionId);
-  return override === undefined ? Boolean(session.active) : override;
+  if (override !== undefined) return override;
+  if (session.active) return true;
+  const last = activeSince.get(session.sessionId);
+  return Boolean(last && Date.now() - last < STICKY_MS);
 }
 
 // ------------------------------------------------------- tool input rendering
@@ -210,6 +363,9 @@ function renderChat(session) {
   const chat = node('div', 'chat');
   chat.dataset.session = session.sessionId;
 
+  const size = sizeFor(session.sessionId);
+  if (size && size.chatH) chat.style.height = `${size.chatH}px`;
+
   if (!messages.length) {
     chat.append(node('div', 'chat-empty', 'No conversation yet.'));
     return chat;
@@ -286,12 +442,17 @@ function renderRequest(request) {
   return wrap;
 }
 
-function renderSession(session) {
+function renderSession(session, columnCount) {
   const expanded = isExpanded(session);
   const classes = ['card'];
   if (expanded) classes.push('expanded');
   if (session.pending.length) classes.push('pending');
   const card = node('div', classes.join(' '));
+
+  const size = sizeFor(session.sessionId);
+  if (size && size.span) {
+    card.style.gridColumn = `span ${clamp(size.span, 1, columnCount)}`;
+  }
 
   const head = node('div', 'card-head');
   head.addEventListener('click', (event) => {
@@ -342,6 +503,16 @@ function renderSession(session) {
     }
   }
 
+  const handle = node('div', 'resize');
+  handle.title = 'Drag to resize · double-click to reset';
+  handle.addEventListener('pointerdown', (event) => beginResize(event, card, session));
+  handle.addEventListener('dblclick', (event) => {
+    event.stopPropagation();
+    forgetSize(session.sessionId);
+    render();
+  });
+  card.append(handle);
+
   return card;
 }
 
@@ -360,7 +531,9 @@ function renderActivity() {
             : 'allowed'
         : entry.behavior === 'deny'
           ? 'denied'
-          : 'released';
+          : entry.via === 'answered-in-terminal'
+            ? 'answered'
+            : 'released';
 
     li.append(node('span', `verb ${entry.behavior}`, verb));
     li.append(node('span', 'who', entry.sessionName || ''));
@@ -376,6 +549,13 @@ function renderActivity() {
 }
 
 function render() {
+  // Replacing the tree mid-drag would drop the element being resized.
+  if (resizing) {
+    renderQueued = true;
+    return;
+  }
+
+  noteActivity();
   const pendingCount = state.pendingCount || 0;
   const activeCount = state.sessions.filter((s) => s.active).length;
 
@@ -401,6 +581,7 @@ function render() {
     });
   });
 
+  const { count } = gridMetrics();
   el.sessions.replaceChildren();
 
   if (!state.sessions.length) {
@@ -409,14 +590,9 @@ function render() {
     empty.append(node('span', null, 'Start a session and it will appear here within a second.'));
     el.sessions.append(empty);
   } else {
-    const expanded = state.sessions.filter(isExpanded);
-    const collapsed = state.sessions.filter((s) => !isExpanded(s));
-
-    expanded.forEach((session) => el.sessions.append(renderSession(session)));
-    if (expanded.length && collapsed.length) {
-      el.sessions.append(node('div', 'group-label', `${collapsed.length} idle`));
-    }
-    collapsed.forEach((session) => el.sessions.append(renderSession(session)));
+    // Server order, as-is: cards expand and collapse in place rather than being
+    // regrouped, so nothing moves out from under the pointer.
+    state.sessions.forEach((session) => el.sessions.append(renderSession(session, count)));
   }
 
   // Restore scroll: panes already at the bottom stay pinned to new output.
@@ -437,11 +613,17 @@ setInterval(() => {
   });
 }, 1000);
 
-// Refresh transcripts for collapsed sessions the user pinned open.
+// Refresh transcripts for collapsed sessions the user pinned open, and re-render
+// so sticky expansion can lapse on a quiet dashboard that isn't being pushed to.
 setInterval(() => {
+  let fetching = false;
   for (const session of state.sessions) {
-    if (isExpanded(session) && !session.messages) loadChat(session.sessionId);
+    if (isExpanded(session) && !session.messages) {
+      loadChat(session.sessionId);
+      fetching = true;
+    }
   }
+  if (!fetching) render();
 }, 4000);
 
 // --------------------------------------------------------------- live updates

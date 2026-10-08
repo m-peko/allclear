@@ -147,8 +147,13 @@ function createServer() {
       });
     }
 
-    const rank = (s) => (s.pending.length ? 0 : s.notice ? 1 : s.status === 'busy' ? 2 : 3);
-    sessions.sort((a, b) => rank(a) - rank(b) || (b.updatedAt || 0) - (a.updatedAt || 0));
+    // Ordered by when each session started, which never changes while it lives.
+    // Sorting by activity instead would reshuffle the grid every second, and a
+    // card that moves while you are reading it is worse than one you have to
+    // look for — a session that needs you is marked, not relocated.
+    sessions.sort(
+      (a, b) => (a.startedAt || 0) - (b.startedAt || 0) || a.sessionId.localeCompare(b.sessionId)
+    );
 
     return {
       sessions,
@@ -168,6 +173,47 @@ function createServer() {
       const frame = `data: ${JSON.stringify(snapshot())}\n\n`;
       for (const client of sseClients) client.write(frame);
     }, 60);
+  }
+
+  // A held request can be answered in the terminal instead of here: Claude Code
+  // shows its own prompt while the hook is still pending, and whichever answers
+  // first wins. It does not close the hook's socket when that happens, so the
+  // only way to notice is the session's own status — Claude Code reports
+  // `waiting` while a prompt is up and moves off it once the prompt is gone.
+  function reapAnsweredElsewhere() {
+    let changed = false;
+
+    for (const [id, record] of [...pending]) {
+      const session = liveSessions.get(record.sessionId);
+
+      if (!session) {
+        // Only sessions we actually saw can be said to have gone away; a request
+        // from a headless run never had a file to begin with.
+        if (record.hadSession) {
+          releaseRequest(id, 'session-ended');
+          changed = true;
+        }
+        continue;
+      }
+      record.hadSession = true;
+
+      if (session.status === 'waiting' || session.waitingFor) {
+        record.sawWaiting = true;
+        continue;
+      }
+
+      // The status takes a beat to catch up with the hook firing.
+      if (Date.now() - record.createdAt < 5000) continue;
+
+      // Either we watched it go into `waiting` and come back out, or it has
+      // settled all the way to idle — both mean nothing is prompting any more.
+      if (record.sawWaiting || session.status === 'idle') {
+        releaseRequest(id, 'answered-in-terminal');
+        changed = true;
+      }
+    }
+
+    return changed;
   }
 
   function scanSessions() {
@@ -194,6 +240,7 @@ function createServer() {
     }
 
     liveSessions = next;
+    if (reapAnsweredElsewhere()) changed = true;
     if (changed) broadcast();
   }
 

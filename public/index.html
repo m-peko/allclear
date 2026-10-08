@@ -4,13 +4,27 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>compa</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23e6a23c'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11.5' stroke='%23161616' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <link rel="icon" href="/logo.svg" />
     <link rel="stylesheet" href="/app.css" />
+    <script>
+      // Applied before first paint so the page never flashes the wrong theme.
+      try {
+        var saved = localStorage.getItem('compa.theme');
+        if (saved === 'dark' || saved === 'light') {
+          document.documentElement.dataset.theme = saved;
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <header class="topbar">
       <div class="brand">
-        <span class="mark" aria-hidden="true"></span>
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="10" y="2" width="20" height="20" rx="5.5" fill="#8a8a95" opacity=".38" />
+          <rect x="2" y="10" width="20" height="20" rx="5.5" fill="var(--accent)" />
+          <path d="M6.8 20.4l3.4 3.4 6.9-7.2" fill="none" stroke="var(--accent-ink)"
+                stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
         <h1>compa</h1>
         <span id="conn" class="conn" data-state="connecting">connecting</span>
       </div>
@@ -22,11 +36,24 @@
       </div>
 
       <div class="controls">
+        <button id="theme" class="icon-btn" title="Switch theme" aria-label="Switch theme">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <g class="icon-sun" fill="none" stroke="currentColor" stroke-width="1.9"
+               stroke-linecap="round">
+              <circle cx="12" cy="12" r="4.2" />
+              <path d="M12 2.4v2.2M12 19.4v2.2M2.4 12h2.2M19.4 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6" />
+            </g>
+            <path class="icon-moon" fill="currentColor"
+                  d="M20.3 14.2A8.4 8.4 0 019.8 3.7a8.6 8.6 0 103.3 16.6 8.6 8.6 0 007.2-6.1z" />
+          </svg>
+        </button>
+
         <label class="toggle" title="Approve every request the moment it arrives, without showing it to you first.">
           <input type="checkbox" id="auto-approve" />
           <span class="track"><span class="thumb"></span></span>
           <span class="toggle-label">Auto-approve</span>
         </label>
+
         <button id="approve-all" class="btn btn-primary btn-lg" disabled>
           Approve all <kbd>A</kbd>
         </button>

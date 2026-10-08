@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="compa">
+  <!-- Two stacked cards: many sessions. The check on the front one: approved.
+       The back card is neutral grey, never a tint of the accent — tinted amber
+       at low alpha turns muddy brown on a dark background. -->
+  <rect x="10" y="2" width="20" height="20" rx="5.5" fill="#8a8a95" opacity=".38" />
+  <rect x="2" y="10" width="20" height="20" rx="5.5" fill="#f5a524" />
+  <path d="M6.8 20.4l3.4 3.4 6.9-7.2" fill="none" stroke="#0a0a0c" stroke-width="3.1"
+        stroke-linecap="round" stroke-linejoin="round" />
+</svg>
