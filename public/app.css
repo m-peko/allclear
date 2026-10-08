@@ -28,6 +28,7 @@
 
   --ring: rgba(245, 165, 36, 0.3);
   --shadow: rgba(0, 0, 0, 0.55);
+  --ghost-fill: rgba(245, 165, 36, 0.12);
   --topbar-bg: rgba(8, 8, 10, 0.86);
 
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
@@ -60,6 +61,7 @@
 
   --ring: rgba(176, 108, 0, 0.3);
   --shadow: rgba(24, 24, 27, 0.14);
+  --ghost-fill: rgba(176, 108, 0, 0.1);
   --topbar-bg: rgba(246, 246, 248, 0.86);
 }
 
@@ -90,6 +92,7 @@
 
     --ring: rgba(176, 108, 0, 0.3);
     --shadow: rgba(24, 24, 27, 0.14);
+    --ghost-fill: rgba(176, 108, 0, 0.1);
     --topbar-bg: rgba(246, 246, 248, 0.86);
   }
 }
@@ -368,18 +371,76 @@ kbd {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 266px;
+  grid-template-columns: 252px minmax(0, 1fr);
   align-items: start;
 }
 
 .sidebar {
   position: sticky;
   top: 59px;
-  padding: 18px 20px 18px 0;
+  padding: 18px 0 18px 20px;
   max-height: calc(100vh - 59px);
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
+}
+
+.side-block + .side-block {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.count {
+  color: var(--faint);
+  font-weight: 500;
+}
+
+.idle-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.idle-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.idle-item:hover {
+  background: var(--panel);
+  border-color: var(--line-soft);
+}
+
+.idle-item .idle-name {
+  font-size: 12.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: none;
+  max-width: 55%;
+}
+
+.idle-item .idle-cwd {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--faint);
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  direction: rtl;
 }
 
 .sidebar::-webkit-scrollbar {
@@ -769,9 +830,40 @@ pre.body .path {
     linear-gradient(135deg, transparent 72%, var(--muted) 72%, var(--muted) 86%, transparent 86%);
 }
 
+/* While dragging, the card follows the pointer in raw pixels and overflows its
+   grid track rather than re-snapping on every move — re-snapping reflows the
+   whole grid under the cursor, which is what makes a resize feel jumpy. It is
+   lifted above its neighbours and the ghost below shows where it will land. */
 .card.resizing {
   user-select: none;
   border-color: var(--accent);
+  transition: none;
+  z-index: 5;
+  will-change: width, height;
+}
+
+/* The settle: the card animates from where the pointer left it to the snapped
+   width, then hands that width back to the grid. */
+.card.settling {
+  transition: width 180ms ease;
+  z-index: 5;
+}
+
+/* The ghost — react-grid-layout calls this the placeholder. It marks the size
+   the card will snap to while the card itself still follows your hand. It is
+   drawn over the card rather than behind it: the card is opaque, and whenever
+   you drag past a column stop the snapped size is the smaller of the two, so a
+   ghost underneath would be completely hidden exactly when it matters. An
+   outline with no fill reads clearly either way. */
+.resize-ghost {
+  position: fixed;
+  z-index: 6;
+  pointer-events: none;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius);
+  background: transparent;
+  box-shadow: 0 0 0 3px var(--ghost-fill);
+  transition: width 110ms ease, height 110ms ease;
 }
 
 body.resizing {
@@ -859,11 +951,12 @@ body.resizing {
   .sidebar {
     position: static;
     max-height: none;
-    padding: 16px 20px 20px;
-    border-top: 1px solid var(--line-soft);
+    padding: 16px 20px 0;
+    order: 2;
   }
 
-  .activity-list {
+  .activity-list,
+  .idle-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
     gap: 4px;

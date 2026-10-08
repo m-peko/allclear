@@ -61,13 +61,21 @@
     </header>
 
     <div class="layout">
-      <main id="sessions" class="sessions"></main>
-
       <aside class="sidebar">
-        <h2>Recent decisions</h2>
-        <ul id="activity" class="activity-list"></ul>
-        <p id="activity-empty" class="sidebar-empty">Nothing decided yet.</p>
+        <section class="side-block">
+          <h2>Idle <span id="idle-count" class="count"></span></h2>
+          <ul id="idle-list" class="idle-list"></ul>
+          <p id="idle-empty" class="sidebar-empty">Nothing idle.</p>
+        </section>
+
+        <section class="side-block">
+          <h2>Recent decisions</h2>
+          <ul id="activity" class="activity-list"></ul>
+          <p id="activity-empty" class="sidebar-empty">Nothing decided yet.</p>
+        </section>
       </aside>
+
+      <main id="sessions" class="sessions"></main>
     </div>
 
     <script src="/app.js"></script>

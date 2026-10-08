@@ -8,31 +8,42 @@ If you keep eight terminals open and spend your day hunting for the one showing
 `Do you want to proceed?`, this is for you.
 
 ```
-┌───────────────────────────────────────────────┬───────────────┐
-│ ● compa  live    8 sessions  3 active  2 waiting│ RECENT        │
-│                  [Auto-approve] [Approve all 2]│ DECISIONS     │
-├───────────────────────────────────────────────┤               │
-│ ▾ api-server-8d      ~/work/api-server   1 [OK]│ ALLOWED  api  │
-│   claude  Reinstalling to clear the lockfile…  │ Bash · pnpm…  │
-│   Bash    git status --porcelain               │               │
-│   ┌ Bash  Reinstall dependencies         8:42 ┐│ DENIED   web  │
-│   │ rm -rf node_modules && pnpm install       ││ Bash · curl…  │
-│   └ [Approve] [Always allow]        [Deny] ───┘│               │
-├───────────────────────────────────────────────┤ ALWAYS   api  │
-│ 5 IDLE                                         │ Edit · src/…  │
-│ › worker-12 ~/work/…  › docs-4a ~/work/…       │               │
-└───────────────────────────────────────────────┴───────────────┘
+┌──────────────┬────────────────────────────────────────────────┐
+│ compa  live        8 sessions   3 active   2 waiting           │
+│                    [Auto-approve]        [Approve all 2]       │
+├──────────────┼────────────────────────────────────────────────┤
+│ IDLE 5       │ ▾ api-server-8d   ~/work/api-server    1 [OK]  │
+│ ● worker-12  │   claude  Reinstalling to clear the lockfile…  │
+│ ● docs-4a    │   Bash    git status --porcelain               │
+│ ● api-77     │   ┌ Bash  Reinstall dependencies         8:42 ┐│
+│ ● web-3f     │   │ rm -rf node_modules && pnpm install       ││
+│ ● jobs-91    │   └ [Approve] [Always allow]        [Deny] ───┘│
+│              ├────────────────────────────────────────────────┤
+│ RECENT       │ ▾ web-client-2c  ~/work/web-client      [BUSY] │
+│ DECISIONS    │   you     ship the rename                      │
+│ ALLOWED api  │   claude  Renaming the module and its imports… │
+│ Bash · pnpm… │   Edit    src/session.ts                       │
+│ DENIED  web  │                                                │
+└──────────────┴────────────────────────────────────────────────┘
 ```
 
-Active sessions expand to show what they're doing — the recent conversation,
-the tool calls, and anything waiting on you. Idle sessions collapse to one-line
-tiles. Click any header to pin a card open or shut.
+Active sessions fill the grid, expanded to show what they're doing — the recent
+conversation, the tool calls, and anything waiting on you. Idle sessions sit in
+the left sidebar above the decision log; click one to open it, click a card's
+header to put it back. A session with a request waiting is never tucked into the
+sidebar, whatever you collapsed earlier.
 
-Drag the corner of a card to resize it: sideways snaps it across grid columns,
-downwards grows its conversation pane. Sizes are remembered per session and the
-last size you picked becomes the default for cards that appear later.
-Double-click the corner to reset one. Dark and light themes are in the top bar,
-following your system setting until you pick one.
+Drag the corner of a card to resize it. The card follows your pointer in raw
+pixels while a dashed ghost marks the column it will snap to, then it animates
+onto that boundary when you let go — the card never re-snaps mid-drag, because
+re-snapping reflows the whole grid under your cursor and that is what makes a
+resize feel jumpy. Sideways sets how many columns it spans, downwards grows its
+conversation pane. Sizes are remembered per session, and the last size you chose
+becomes the default for cards that appear later. Double-click the corner to
+reset one.
+
+Dark and light themes are in the top bar, following your system setting until
+you pick one.
 
 ## Install
 

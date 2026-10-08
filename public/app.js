@@ -15,6 +15,9 @@ const el = {
   conn: document.getElementById('conn'),
   activity: document.getElementById('activity'),
   activityEmpty: document.getElementById('activity-empty'),
+  idleList: document.getElementById('idle-list'),
+  idleEmpty: document.getElementById('idle-empty'),
+  idleCount: document.getElementById('idle-count'),
 };
 
 let state = { sessions: [], pendingCount: 0, autoApprove: false, activity: [] };
@@ -105,12 +108,17 @@ function gridMetrics() {
 let resizing = null;
 let renderQueued = false;
 
+const snappedWidth = (span, stride, gap) => span * stride - gap;
+
 function beginResize(event, card, session) {
   event.preventDefault();
   event.stopPropagation(); // the header's click handler must not toggle the card
 
   const chat = card.querySelector('.chat');
   const { count, stride, gap } = gridMetrics();
+
+  const ghost = node('div', 'resize-ghost');
+  document.body.append(ghost);
 
   resizing = {
     sessionId: session.sessionId,
@@ -121,9 +129,11 @@ function beginResize(event, card, session) {
     result: { ...(sizeFor(session.sessionId) || {}) },
     card,
     chat,
+    ghost,
     count,
     stride,
     gap,
+    span: null,
   };
 
   card.classList.add('resizing');
@@ -131,39 +141,86 @@ function beginResize(event, card, session) {
   window.addEventListener('pointermove', onResizeMove);
   window.addEventListener('pointerup', endResize, { once: true });
   window.addEventListener('pointercancel', endResize, { once: true });
+
+  onResizeMove(event);
 }
 
 function onResizeMove(event) {
   if (!resizing) return;
-  const { card, chat, stride, gap, count } = resizing;
+  const { card, chat, ghost, stride, gap, count } = resizing;
 
-  // A card spanning n columns is n*stride - gap wide, so invert that for n.
-  const width = resizing.startWidth + (event.clientX - resizing.startX);
-  const span = clamp(Math.round((width + gap) / stride), 1, count);
-  card.style.gridColumn = `span ${span}`;
-  resizing.result.span = span;
+  // The card itself takes the raw pointer width, overflowing its track. Nothing
+  // else in the grid moves, so the drag stays smooth.
+  const raw = clamp(
+    resizing.startWidth + (event.clientX - resizing.startX),
+    snappedWidth(1, stride, gap),
+    snappedWidth(count, stride, gap)
+  );
+  card.style.width = `${raw}px`;
 
   if (chat) {
     const height = clamp(resizing.startChatH + (event.clientY - resizing.startY), 110, 1200);
     chat.style.height = `${height}px`;
     resizing.result.chatH = height;
   }
+
+  // A card spanning n columns is n*stride - gap wide, so invert that for n.
+  const span = clamp(Math.round((raw + gap) / stride), 1, count);
+  resizing.span = span;
+  resizing.result.span = span;
+
+  // The card's left/top never change during a resize, but the page may scroll,
+  // so read them fresh rather than caching the opening rect.
+  const rect = card.getBoundingClientRect();
+  ghost.style.left = `${rect.left}px`;
+  ghost.style.top = `${rect.top}px`;
+  ghost.style.width = `${snappedWidth(span, stride, gap)}px`;
+  ghost.style.height = `${rect.height}px`;
 }
 
 function endResize() {
   if (!resizing) return;
-  const { card, sessionId, result } = resizing;
+  const { card, chat, ghost, sessionId, result, span, stride, gap } = resizing;
 
+  ghost.remove();
   card.classList.remove('resizing');
   document.body.classList.remove('resizing');
   window.removeEventListener('pointermove', onResizeMove);
   rememberSize(sessionId, result);
   resizing = null;
 
-  if (renderQueued) {
-    renderQueued = false;
-    render();
+  // Animate the last few pixels onto the column boundary, then hand the width
+  // back to the grid. Swapping to the span at the same width is seamless.
+  const target = snappedWidth(span || 1, stride, gap);
+  const settle = () => {
+    card.classList.remove('settling');
+    card.style.transition = '';
+    card.style.width = '';
+    card.style.gridColumn = `span ${span || 1}`;
+    if (renderQueued) {
+      renderQueued = false;
+      render();
+    }
+  };
+
+  if (Math.abs(card.offsetWidth - target) < 1) {
+    settle();
+    return;
   }
+
+  card.classList.add('settling');
+  card.style.width = `${target}px`;
+  // transitionend alone can be missed if the layout settles early.
+  const done = () => {
+    card.removeEventListener('transitionend', done);
+    clearTimeout(timer);
+    settle();
+  };
+  const timer = setTimeout(done, 260);
+  card.addEventListener('transitionend', done);
+
+  // Chat height is free-form, so it is already where it should be.
+  void chat;
 }
 
 // ------------------------------------------------------------------ helpers
@@ -214,6 +271,9 @@ function noteActivity() {
 }
 
 function isExpanded(session) {
+  // A request waiting on you is never tucked away in the sidebar, whatever was
+  // collapsed earlier.
+  if (session.pending.length) return true;
   const override = overrides.get(session.sessionId);
   if (override !== undefined) return override;
   if (session.active) return true;
@@ -516,6 +576,24 @@ function renderSession(session, columnCount) {
   return card;
 }
 
+function renderIdle(sessions) {
+  el.idleList.replaceChildren();
+  el.idleEmpty.hidden = sessions.length > 0;
+  el.idleCount.textContent = sessions.length ? String(sessions.length) : '';
+
+  for (const session of sessions) {
+    const li = node('li', 'idle-item');
+    li.title = `${session.cwd}\nClick to open`;
+    li.addEventListener('click', () => toggle(session));
+
+    const dot = node('span', `dot ${session.status}`);
+    li.append(dot);
+    li.append(node('span', 'idle-name', session.name));
+    li.append(node('span', 'idle-cwd', shortPath(session.cwd)));
+    el.idleList.append(li);
+  }
+}
+
 function renderActivity() {
   el.activity.replaceChildren();
   el.activityEmpty.hidden = state.activity.length > 0;
@@ -582,6 +660,9 @@ function render() {
   });
 
   const { count } = gridMetrics();
+  const open = state.sessions.filter(isExpanded);
+  const idle = state.sessions.filter((s) => !isExpanded(s));
+
   el.sessions.replaceChildren();
 
   if (!state.sessions.length) {
@@ -589,11 +670,18 @@ function render() {
     empty.append(node('strong', null, 'No Claude Code sessions running'));
     empty.append(node('span', null, 'Start a session and it will appear here within a second.'));
     el.sessions.append(empty);
+  } else if (!open.length) {
+    const empty = node('div', 'empty');
+    empty.append(node('strong', null, 'Everything is idle'));
+    empty.append(node('span', null, 'Pick a session from the sidebar to open it.'));
+    el.sessions.append(empty);
   } else {
-    // Server order, as-is: cards expand and collapse in place rather than being
-    // regrouped, so nothing moves out from under the pointer.
-    state.sessions.forEach((session) => el.sessions.append(renderSession(session, count)));
+    // Server order, as-is: within the grid nothing moves around as sessions
+    // work, so a card never shifts out from under the pointer.
+    open.forEach((session) => el.sessions.append(renderSession(session, count)));
   }
+
+  renderIdle(idle);
 
   // Restore scroll: panes already at the bottom stay pinned to new output.
   el.sessions.querySelectorAll('.chat[data-session]').forEach((pane) => {
