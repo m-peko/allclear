@@ -11,7 +11,7 @@ const { createServer } = require('../src/server');
 const COMPA_HOOK_URL = /^https?:\/\/127\.0\.0\.1:\d+\/hook\//;
 
 const args = process.argv.slice(2);
-const command = args.find((a) => !a.startsWith('-')) || 'start';
+const command = args.find((a) => !a.startsWith('-')) || 'setup';
 
 function flag(name) {
   return args.includes(`--${name}`);
@@ -127,10 +127,40 @@ function uninstall() {
   console.log(`✓ compa hooks removed from ${SETTINGS_FILE}`);
 }
 
+function installedGroups(settings) {
+  return Object.values(settings.hooks || {})
+    .flatMap((g) => (Array.isArray(g) ? g : []))
+    .filter(isCompaGroup);
+}
+
+// The port baked into the installed hooks. A server listening anywhere else
+// receives nothing at all, and does so silently, so it is worth saying.
+function installedPort(settings) {
+  for (const group of installedGroups(settings)) {
+    for (const hook of group.hooks) {
+      const match = /^https?:\/\/127\.0\.0\.1:(\d+)\//.exec(hook.url || '');
+      if (match) return Number(match[1]);
+    }
+  }
+  return null;
+}
+
+// The one-command path: make sure the hooks are in place, then run. This is what
+// a bare `compa` does, so a first run is a single command.
+function setup() {
+  if (installedGroups(readSettings()).length) {
+    console.log(`✓ compa hooks already in ${SETTINGS_FILE}`);
+  } else {
+    console.log(`Adding compa's hooks to ${SETTINGS_FILE} …`);
+    install();
+  }
+  console.log('');
+  start();
+}
+
 function status() {
   const settings = readSettings();
-  const groups = Object.values(settings.hooks || {}).flatMap((g) => (Array.isArray(g) ? g : []));
-  const installed = groups.filter(isCompaGroup);
+  const installed = installedGroups(settings);
 
   console.log(`settings:  ${SETTINGS_FILE}`);
   console.log(`hooks:     ${installed.length ? `installed (${installed.length} groups)` : 'not installed — run: compa install'}`);
@@ -171,12 +201,16 @@ function start() {
   server.listen(port, '127.0.0.1', () => {
     const url = `http://127.0.0.1:${port}`;
     const settings = readSettings();
-    const installed = Object.values(settings.hooks || {})
-      .flatMap((g) => (Array.isArray(g) ? g : []))
-      .some(isCompaGroup);
+    const installed = installedGroups(settings).length > 0;
+    const hookPort = installedPort(settings);
 
     console.log(`compa → ${url}`);
-    if (!installed) console.log('⚠ hooks are not installed yet — run: compa install');
+    if (!installed) {
+      console.log('⚠ hooks are not installed yet — run: compa install');
+    } else if (hookPort && hookPort !== port) {
+      console.log(`⚠ your hooks point at port ${hookPort}, so nothing will reach this server.`);
+      console.log(`  Run: compa install --port ${port}`);
+    }
     if (!flag('no-open')) openBrowser(url);
   });
 
@@ -189,17 +223,24 @@ function start() {
   process.on('SIGTERM', shutdown);
 }
 
-const commands = { start, install, uninstall, status };
+const commands = { setup, start, install, uninstall, status };
 
-if (!commands[command]) {
+if (!commands[command] || flag('help')) {
   console.log(`compa — approve Claude Code permission requests from your browser
 
+  compa              set up if needed, then open the dashboard
+  compa start        run the dashboard without touching your settings
   compa install      add compa's hooks to ~/.claude/settings.json (backs it up first)
-  compa start        run the dashboard        [--port N] [--no-open]
-  compa status       show hooks, sessions, server
+  compa status       show hooks, live sessions and whether the server is up
   compa uninstall    remove compa's hooks
+
+  --port N           use a different port (default ${DEFAULT_PORT})
+  --no-open          don't open a browser
+
+Not installed? Run it straight from GitHub:
+  npx github:m-peko/compa
 `);
-  process.exit(command === 'help' || flag('help') ? 0 : 1);
+  process.exit(!commands[command] && command !== 'help' ? 1 : 0);
 }
 
 commands[command]();

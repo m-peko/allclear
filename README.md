@@ -1,82 +1,113 @@
-# compa
+<p align="center">
+  <img src="docs/logo.svg" width="76" height="76" alt="">
+</p>
 
-A browser dashboard for every Claude Code session you have running. It shows which
-sessions are alive, which ones are blocked on a permission request, and lets you
-clear them all with one click.
+<h1 align="center">compa</h1>
 
-If you keep eight terminals open and spend your day hunting for the one showing
-`Do you want to proceed?`, this is for you.
+<p align="center">
+  One browser tab for every Claude Code session you have running —<br>
+  see what they're doing, and clear every permission prompt with one click.
+</p>
 
-```
-┌──────────────┬────────────────────────────────────────────────┐
-│ compa  live        8 sessions   3 active   2 waiting           │
-│                    [Auto-approve]        [Approve all 2]       │
-├──────────────┼────────────────────────────────────────────────┤
-│ IDLE 5       │ ▾ api-server-8d   ~/work/api-server    1 [OK]  │
-│ ● worker-12  │   claude  Reinstalling to clear the lockfile…  │
-│ ● docs-4a    │   Bash    git status --porcelain               │
-│ ● api-77     │   ┌ Bash  Reinstall dependencies         8:42 ┐│
-│ ● web-3f     │   │ rm -rf node_modules && pnpm install       ││
-│ ● jobs-91    │   └ [Approve] [Always allow]        [Deny] ───┘│
-│              ├────────────────────────────────────────────────┤
-│ RECENT       │ ▾ web-client-2c  ~/work/web-client      [BUSY] │
-│ DECISIONS    │   you     ship the rename                      │
-│ ALLOWED api  │   claude  Renaming the module and its imports… │
-│ Bash · pnpm… │   Edit    src/session.ts                       │
-│ DENIED  web  │                                                │
-└──────────────┴────────────────────────────────────────────────┘
-```
+<p align="center">
+  <a href="#install"><img src="https://img.shields.io/badge/install-npx-f5a524" alt="npx"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A518-444" alt="node >= 18">
+  <img src="https://img.shields.io/badge/dependencies-none-444" alt="no dependencies">
+  <img src="https://img.shields.io/badge/license-MIT-444" alt="MIT">
+</p>
 
-Active sessions fill the grid, expanded to show what they're doing — the recent
-conversation, the tool calls, and anything waiting on you. Idle sessions sit in
-the left sidebar above the decision log.
+<p align="center">
+  <img src="docs/screenshot.png" alt="compa showing four sessions, two of them waiting for approval">
+</p>
 
-Each card is titled with the name Claude Code gave that session, the same string
-the session shows for itself, and tagged with the repository it is working in.
-A card has three states and they are separate gestures:
+---
 
-| | |
-| :-- | :-- |
-| Click the header | Folds the card shut where it is, keeping its width and place |
-| Click the **×** | Takes it off the grid; it waits in the sidebar |
-| Click a sidebar row | Puts it back on the grid, open |
-
-A session with a request waiting is always on the grid, whatever you put away
-earlier.
-
-Drag the corner of a card to resize it. The card follows your pointer in raw
-pixels while a dashed ghost marks the column it will snap to, then it animates
-onto that boundary when you let go — the card never re-snaps mid-drag, because
-re-snapping reflows the whole grid under your cursor and that is what makes a
-resize feel jumpy. Sideways sets how many columns it spans, downwards grows its
-conversation pane. Sizes are remembered per session, and the last size you chose
-becomes the default for cards that appear later. Double-click the corner to
-reset one.
-
-Dark and light themes are in the top bar, following your system setting until
-you pick one.
+If you keep six terminals open and spend your day hunting for the one stuck on
+`Do you want to proceed?`, this is for you. compa puts every session in one page,
+shows you the command, diff or URL each one is waiting on, and lets you answer
+them all at once.
 
 ## Install
 
-Requires Node 18+. No dependencies.
+Node 18 or newer. No dependencies, nothing to build.
+
+```bash
+npx github:m-peko/compa
+```
+
+That's it. It adds its hooks to `~/.claude/settings.json`, starts a local server
+and opens the dashboard. Sessions you already have open pick it up within
+seconds — no restart needed.
+
+<details>
+<summary>Other ways to install</summary>
+
+**Globally**, so you can just type `compa`:
+
+```bash
+npm install -g github:m-peko/compa
+compa
+```
+
+**From a clone**, if you want to hack on it:
 
 ```bash
 git clone https://github.com/m-peko/compa.git
 cd compa
-npm link            # or: node bin/compa.js <command>
-
-compa install       # add the hooks to ~/.claude/settings.json
-compa start         # run the dashboard, opens http://127.0.0.1:4517
+npm link
+compa
 ```
 
-`compa install` backs your settings file up to
-`~/.claude/settings.json.compa-backup-<timestamp>` before touching it, and only
-adds its own hook entries — anything already in `hooks` is left alone.
+</details>
 
-Claude Code re-reads its settings while running, so sessions you already have open
-generally start routing to the dashboard within seconds. If one doesn't, restart it.
+To remove it, run `compa uninstall` (or `npx github:m-peko/compa uninstall`).
+Your settings file is backed up to
+`~/.claude/settings.json.compa-backup-<timestamp>` before anything is written to
+it, and only compa's own hook entries are ever added or removed.
 
-To remove it: `compa uninstall`.
+## What you get
+
+**Every session in one place.** Active sessions fill the grid, each showing its
+recent conversation — what you asked, what Claude replied, which tools it ran.
+Idle ones wait in the sidebar. Each card is titled with the name Claude Code gave
+that session and tagged with the repository it's working in.
+
+**Requests you can actually judge.** A pending call is shown in full: the whole
+shell command, the real before/after of an edit, the URL being fetched. **Approve
+all** (or <kbd>A</kbd>) answers every one on screen — a bulk decision, not a blind
+one.
+
+**Nothing silently stuck.** Each request shows how long compa will hold it. Let it
+run out, or quit compa, and it falls back to the terminal prompt exactly as if
+compa had never been there.
+
+## Commands
+
+| | |
+| :-- | :-- |
+| `compa` | Set up if needed, then open the dashboard |
+| `compa start` | Run the dashboard without touching your settings |
+| `compa install` | Add the hooks to `~/.claude/settings.json` |
+| `compa status` | Show hooks, live sessions, and whether the server is up |
+| `compa uninstall` | Remove the hooks |
+
+`--port N` runs on a different port — pass it to `install` as well, so the hooks
+point at the right place. `--no-open` skips opening a browser.
+
+## Using it
+
+| | |
+| :-- | :-- |
+| Click a card header | Folds it shut, keeping its width and place |
+| Click the **×** | Takes it off the grid; it waits in the sidebar |
+| Click a sidebar row | Puts it back on the grid, open |
+| Drag a card's corner | Resizes it — sideways in columns, down for the conversation pane |
+| Double-click the corner | Resets that card's size |
+| <kbd>A</kbd> | Approves everything on screen |
+
+Card sizes are remembered per session, and the last size you chose becomes the
+default for cards that appear later. Dark and light themes are in the top bar,
+following your system setting until you pick one.
 
 ## How it works
 
@@ -87,73 +118,16 @@ local server:
 
 1. A session wants to run something that needs permission.
 2. Claude Code POSTs the request to compa and waits on the response.
-3. The request appears in your browser, with the full command, diff or URL.
-4. You click. compa answers the open request, and the session continues.
+3. It appears in your browser, in full.
+4. You click. compa answers the open request, and the session carries on.
 
 Because the decision rides on the hook response, there is no polling and no
 keystroke injection — this is the interface Claude Code provides for exactly this
 purpose.
 
-Two smaller hooks fill in the gaps: `Notification` (matcher `permission_prompt`)
-surfaces the few prompts that never raise a `PermissionRequest`, such as a
-sandboxed command's network request, and `SessionEnd` clears a session's rows
-when it exits.
-
-### Sessions
-
-Live sessions come from `~/.claude/sessions/*.json`, which Claude Code maintains
-per process. Those files are never cleaned up, so compa filters them: a record
-counts as live only if its pid exists **and** the process start time still matches
-the `procStart` recorded in the file, which rules out a recycled pid. On a box with
-131 session files, that typically leaves the 8 or so that are genuinely running.
-
-A session counts as **active** — and so renders expanded — when it is busy, waiting
-on a prompt, or holding a permission request. Everything else collapses to a tile.
-
-Cards are ordered by when their session started, which never changes while it
-runs, so the grid doesn't reshuffle underneath you: cards expand and collapse in
-place, and a session that needs you is marked rather than moved. Sessions flip
-between busy and idle constantly, so a card that was active stays open for 30
-seconds after it settles instead of flapping shut.
-
-### Titles and repositories
-
-Claude Code names a session with an `ai-title` record in the transcript, rewritten
-as the conversation moves on, so the last one in the file is the current title.
-compa picks it out of the same tail it already reads for the conversation, at no
-extra cost, and falls back to the session's short name until one has been earned.
-
-The repository badge is resolved from the session's working directory by walking
-up to the nearest `.git`. A worktree under `<repo>/.claude/worktrees/<name>` has
-its own `.git` file pointing back at the real repository, so that suffix is
-stripped first and the badge reads `repo/worktree` — otherwise every worktree
-would badge as itself rather than as the repository it belongs to.
-
-### The conversation view
-
-Expanded cards show the tail of the session's transcript from
-`~/.claude/projects/<slug>/<id>.jsonl`: what you asked, what Claude said, and the
-tool calls in between. Those files routinely pass several megabytes, so compa never
-reads one whole — it seeks to the last 256KB, walks backwards until it has enough
-turns, and caches the result against the file's size and mtime. Subagent chatter and
-tool-result plumbing are filtered out so the thread stays readable.
-
-Transcripts are read from disk and sent to your own browser over localhost. They
-are not written to, and nothing leaves the machine.
-
-### Requests you answer in the terminal
-
-Claude Code shows its own prompt while the hook is still pending — whichever
-answers first wins. If you answer in the terminal, it does **not** close the
-hook's connection, so compa has no direct way to learn the request is settled and
-the card would sit there forever.
-
-What gives it away is the session's own status. Claude Code reports `waiting`
-while a prompt is up and moves off it once the prompt is gone, so compa drops a
-held request when its session has stopped waiting — either because it watched the
-session enter `waiting` and leave it, or because the session has gone fully idle.
-A five-second grace period covers the lag between the hook firing and the status
-catching up. Those show up as `answered` in the sidebar.
+Two smaller hooks fill the gaps: `Notification` surfaces the few prompts that
+never raise a `PermissionRequest`, such as a sandboxed command's network request,
+and `SessionEnd` clears a session's rows when it exits.
 
 ### If compa isn't running
 
@@ -161,36 +135,65 @@ A failed connection to the hook is a non-blocking error in Claude Code: it simpl
 carries on with its normal permission flow and prompts in the terminal. Stopping
 compa, or never starting it, changes nothing about how your sessions behave.
 
-The same applies to anything compa is still holding when you quit it — every held
-request is released back to the terminal prompt on shutdown.
+The same applies to anything compa is still holding when you quit — every held
+request is handed back to the terminal prompt on shutdown.
+
+### Requests you answer in the terminal
+
+Claude Code shows its own prompt while the hook is still pending; whichever
+answers first wins. If you answer in the terminal it does **not** close the hook's
+connection, so compa has no direct way to learn the request is settled.
+
+What gives it away is the session's own status. Claude Code reports `waiting`
+while a prompt is up and moves off it once the prompt is gone, so compa drops a
+held request when its session has stopped waiting — either because it watched the
+session enter `waiting` and leave it, or because the session has gone fully idle.
+A five-second grace period covers the lag. Those appear as `answered` in the
+sidebar.
 
 ### Timeouts
 
 compa holds a request for 9 minutes (`COMPA_HOLD_MS`), just under the hook's
 10-minute timeout, then releases it to the terminal prompt. Each card shows the
-time remaining. Nothing gets stuck waiting on a browser tab you closed.
+time remaining, so nothing is left waiting on a browser tab you closed.
 
-## Commands
+### Finding your sessions
 
-| Command | |
-| :-- | :-- |
-| `compa start` | Run the dashboard. `--port N`, `--no-open` |
-| `compa install` | Add hooks to `~/.claude/settings.json`. `--port N` |
-| `compa status` | Show hooks, live sessions, server state |
-| `compa uninstall` | Remove the hooks |
+Live sessions come from `~/.claude/sessions/*.json`, which Claude Code maintains
+per process. Those files are never cleaned up, so compa filters them: a record
+counts as live only if its pid exists **and** the process start time still matches
+the `procStart` recorded in the file, which rules out a recycled pid. On a machine
+with 131 session files, that typically leaves the 8 that are genuinely running.
 
-Press <kbd>A</kbd> anywhere in the dashboard to approve everything. Click a card
-header to expand or collapse that session.
+### Titles and repositories
+
+Claude Code names a session with an `ai-title` record in the transcript, rewritten
+as the conversation moves on, so the last one in the file is the current title.
+The repository badge is resolved by walking up from the session's working
+directory to the nearest `.git`. A worktree under
+`<repo>/.claude/worktrees/<name>` has its own `.git` file pointing back at the
+real repository, so that suffix is stripped first and the badge reads
+`repo/worktree`.
+
+### The conversation view
+
+Expanded cards show the tail of the session's transcript from
+`~/.claude/projects/<slug>/<id>.jsonl`. Those files routinely pass several
+megabytes, so compa never reads one whole — it seeks to the last 256KB, walks
+backwards until it has enough turns, and caches the result against the file's size
+and mtime. Subagent chatter and tool-result plumbing are filtered out.
+
+Transcripts are read from disk and sent to your own browser over localhost. They
+are not written to, and nothing leaves your machine.
 
 ## About approving everything
 
 **Approve all** grants every request currently on screen. They are all rendered in
-full first — the command, the diff, the URL — so it is a bulk decision, not a blind
-one.
+full first, so it is a bulk decision rather than a blind one.
 
-**Auto-approve** is a different thing and the toggle asks you to confirm before it
+**Auto-approve** is a different thing, and the toggle asks you to confirm before it
 turns on. While it is on, requests are granted the instant they arrive and you
-never see them. That includes commands that delete files, rewrite history or reach
+never see them — including commands that delete files, rewrite history or reach
 the network. It is the dashboard's equivalent of
 `--dangerously-skip-permissions`, applied to every session at once. Leave it off
 unless you know exactly what is running.
@@ -202,8 +205,8 @@ terminal's "Yes, and don't ask again" does.
 ## Scope
 
 The server binds to `127.0.0.1` only. Anyone who can reach the port can approve
-tool calls on your machine, so don't put it on `0.0.0.0` or behind a tunnel
-without authentication in front of it.
+tool calls on your machine, so don't move it to `0.0.0.0` or put it behind a
+tunnel without authentication in front of it.
 
 Session discovery reads `/proc` on Linux and falls back to a signal probe
 elsewhere; the rest is platform-independent.
