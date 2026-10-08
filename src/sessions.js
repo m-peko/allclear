@@ -40,6 +40,36 @@ function isAlive(rec) {
   }
 }
 
+// cwd -> { repo, worktree }. Resolving this walks the filesystem, and a session's
+// cwd rarely changes, so it is worth caching.
+const repoCache = new Map();
+
+function repoOf(cwd) {
+  if (!cwd) return { repo: '', worktree: '' };
+  const cached = repoCache.get(cwd);
+  if (cached) return cached;
+
+  // A worktree lives at <repo>/.claude/worktrees/<name>; its own `.git` is a
+  // file pointing back at the real repository, so strip that suffix first and
+  // the walk below lands on the repository everyone would name.
+  const [base, rest] = cwd.split('/.claude/worktrees/');
+  const worktree = rest ? rest.split('/')[0] : '';
+
+  let dir = base;
+  let repo = '';
+  for (let depth = 0; depth < 40 && dir && dir !== '/' && dir !== '.'; depth += 1) {
+    if (fs.existsSync(path.join(dir, '.git'))) {
+      repo = path.basename(dir);
+      break;
+    }
+    dir = path.dirname(dir);
+  }
+
+  const result = { repo: repo || path.basename(base) || '', worktree };
+  repoCache.set(cwd, result);
+  return result;
+}
+
 function readAll() {
   let files;
   try {
@@ -58,10 +88,13 @@ function readAll() {
       continue; // half-written or stale-locked file; it will be picked up next scan
     }
     if (!rec.sessionId || !isAlive(rec)) continue;
+    const { repo, worktree } = repoOf(rec.cwd);
     live.push({
       sessionId: rec.sessionId,
       pid: rec.pid,
       name: rec.name || rec.sessionId.slice(0, 8),
+      repo,
+      worktree,
       cwd: rec.cwd || '',
       status: rec.status || 'unknown',
       waitingFor: rec.waitingFor || null,

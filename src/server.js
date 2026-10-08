@@ -118,6 +118,9 @@ function createServer() {
         ...session,
         notice,
         active,
+        // The title Claude Code gave the session, falling back to its short name
+        // until the conversation is far enough along to have earned one.
+        title: transcript.title(session.sessionId) || session.name,
         pending: requests,
         messages: active ? transcript.read(session.sessionId, 10) : null,
       });
@@ -132,6 +135,9 @@ function createServer() {
         sessionId,
         pid: null,
         name: sessionId.slice(0, 8),
+        title: transcript.title(sessionId) || sessionId.slice(0, 8),
+        repo: '',
+        worktree: '',
         cwd: requests[0].cwd || '',
         status: 'waiting',
         kind: 'detached',

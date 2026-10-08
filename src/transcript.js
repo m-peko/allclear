@@ -159,33 +159,59 @@ function buildEvents(lines, limit) {
   return events;
 }
 
-function read(sessionId, limit = 12) {
+// Claude Code names a session with an `ai-title` record, rewritten as the
+// conversation moves on, so the last one in the file is the current title — the
+// same string the session shows in its own UI.
+function lastTitle(lines) {
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (!line.includes('"ai-title"')) continue;
+    try {
+      const entry = JSON.parse(line);
+      if (entry.type === 'ai-title' && entry.aiTitle) return String(entry.aiTitle);
+    } catch {
+      /* keep looking */
+    }
+  }
+  return null;
+}
+
+// One parse of the tail serves both the conversation and the title.
+function load(sessionId, limit) {
   const file = locate(sessionId);
-  if (!file) return [];
+  if (!file) return { events: [], title: null };
 
   let stat;
   try {
     stat = fs.statSync(file);
   } catch {
-    return [];
+    return { events: [], title: null };
   }
 
   const cached = tailCache.get(file);
-  if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs) {
-    return cached.events.slice(-limit);
-  }
+  if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs) return cached;
 
-  let events = [];
+  let parsed = { events: [], title: null };
   try {
-    events = buildEvents(tailLines(file), Math.max(limit, 20));
+    const lines = tailLines(file);
+    parsed = { events: buildEvents(lines, Math.max(limit, 20)), title: lastTitle(lines) };
   } catch {
-    events = [];
+    /* unreadable right now; try again on the next scan */
   }
 
-  tailCache.set(file, { size: stat.size, mtimeMs: stat.mtimeMs, events });
+  const record = { size: stat.size, mtimeMs: stat.mtimeMs, ...parsed };
+  tailCache.set(file, record);
   if (tailCache.size > 64) tailCache.delete(tailCache.keys().next().value);
 
-  return events.slice(-limit);
+  return record;
 }
 
-module.exports = { read };
+function read(sessionId, limit = 12) {
+  return load(sessionId, limit).events.slice(-limit);
+}
+
+function title(sessionId) {
+  return load(sessionId, 20).title;
+}
+
+module.exports = { read, title };

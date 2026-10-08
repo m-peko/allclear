@@ -29,9 +29,20 @@ If you keep eight terminals open and spend your day hunting for the one showing
 
 Active sessions fill the grid, expanded to show what they're doing — the recent
 conversation, the tool calls, and anything waiting on you. Idle sessions sit in
-the left sidebar above the decision log; click one to open it, click a card's
-header to put it back. A session with a request waiting is never tucked into the
-sidebar, whatever you collapsed earlier.
+the left sidebar above the decision log.
+
+Each card is titled with the name Claude Code gave that session, the same string
+the session shows for itself, and tagged with the repository it is working in.
+A card has three states and they are separate gestures:
+
+| | |
+| :-- | :-- |
+| Click the header | Folds the card shut where it is, still on the grid |
+| Click the **×** | Takes it off the grid; it waits in the sidebar |
+| Click a sidebar row | Puts it back on the grid, open |
+
+A session with a request waiting is always on the grid, whatever you put away
+earlier.
 
 Drag the corner of a card to resize it. The card follows your pointer in raw
 pixels while a dashed ghost marks the column it will snap to, then it animates
@@ -104,6 +115,19 @@ runs, so the grid doesn't reshuffle underneath you: cards expand and collapse in
 place, and a session that needs you is marked rather than moved. Sessions flip
 between busy and idle constantly, so a card that was active stays open for 30
 seconds after it settles instead of flapping shut.
+
+### Titles and repositories
+
+Claude Code names a session with an `ai-title` record in the transcript, rewritten
+as the conversation moves on, so the last one in the file is the current title.
+compa picks it out of the same tail it already reads for the conversation, at no
+extra cost, and falls back to the session's short name until one has been earned.
+
+The repository badge is resolved from the session's working directory by walking
+up to the nearest `.git`. A worktree under `<repo>/.claude/worktrees/<name>` has
+its own `.git` file pointing back at the real repository, so that suffix is
+stripped first and the badge reads `repo/worktree` — otherwise every worktree
+would badge as itself rather than as the repository it belongs to.
 
 ### The conversation view
 

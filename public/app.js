@@ -24,9 +24,12 @@ let state = { sessions: [], pendingCount: 0, autoApprove: false, activity: [] };
 let seenRequestIds = new Set();
 const busyIds = new Set();
 
-// Manual collapse/expand overrides, keyed by session id. Absent means "follow
-// whatever the session is doing".
-const overrides = new Map();
+// A card has three states, and they are independent: whether it is on the grid
+// at all, and if so whether its body is open. Collapsing is not the same gesture
+// as putting it away.
+const pinned = new Set(); // opened from the sidebar: stays on the grid
+const dismissed = new Set(); // sent away with the × : stays off the grid
+const collapsed = new Set(); // on the grid, body folded shut
 // Transcripts for sessions the server doesn't ship chat for (collapsed ones the
 // user expanded by hand).
 const fetchedChats = new Map();
@@ -270,15 +273,19 @@ function noteActivity() {
   }
 }
 
-function isExpanded(session) {
+function onGrid(session) {
   // A request waiting on you is never tucked away in the sidebar, whatever was
-  // collapsed earlier.
+  // put away earlier.
   if (session.pending.length) return true;
-  const override = overrides.get(session.sessionId);
-  if (override !== undefined) return override;
+  if (pinned.has(session.sessionId)) return true;
+  if (dismissed.has(session.sessionId)) return false;
   if (session.active) return true;
   const last = activeSince.get(session.sessionId);
   return Boolean(last && Date.now() - last < STICKY_MS);
+}
+
+function isExpanded(session) {
+  return onGrid(session) && !collapsed.has(session.sessionId);
 }
 
 // ------------------------------------------------------- tool input rendering
@@ -385,10 +392,31 @@ async function loadChat(sessionId) {
   }
 }
 
-function toggle(session) {
-  const next = !isExpanded(session);
-  overrides.set(session.sessionId, next);
-  if (next && !session.messages) loadChat(session.sessionId);
+// Clicking the header folds the card where it sits; it does not put it away.
+function toggleCollapse(session) {
+  const id = session.sessionId;
+  if (collapsed.has(id)) {
+    collapsed.delete(id);
+    if (!session.messages) loadChat(id);
+  } else {
+    collapsed.add(id);
+  }
+  render();
+}
+
+// The × takes the card off the grid and leaves it in the sidebar.
+function dismiss(session) {
+  dismissed.add(session.sessionId);
+  pinned.delete(session.sessionId);
+  collapsed.delete(session.sessionId);
+  render();
+}
+
+function openFromSidebar(session) {
+  pinned.add(session.sessionId);
+  dismissed.delete(session.sessionId);
+  collapsed.delete(session.sessionId);
+  if (!session.messages) loadChat(session.sessionId);
   render();
 }
 
@@ -502,22 +530,29 @@ function renderRequest(request) {
   return wrap;
 }
 
+function repoLabel(session) {
+  if (!session.repo) return '';
+  return session.worktree ? `${session.repo}/${session.worktree}` : session.repo;
+}
+
 function renderSession(session, columnCount) {
   const expanded = isExpanded(session);
   const classes = ['card'];
-  if (expanded) classes.push('expanded');
+  classes.push(expanded ? 'expanded' : 'folded');
   if (session.pending.length) classes.push('pending');
   const card = node('div', classes.join(' '));
 
+  // A folded card is just a header bar, so it keeps one column; the remembered
+  // width belongs to the open card.
   const size = sizeFor(session.sessionId);
-  if (size && size.span) {
+  if (expanded && size && size.span) {
     card.style.gridColumn = `span ${clamp(size.span, 1, columnCount)}`;
   }
 
   const head = node('div', 'card-head');
   head.addEventListener('click', (event) => {
     if (event.target.closest('button')) return; // header buttons act on their own
-    toggle(session);
+    toggleCollapse(session);
   });
 
   head.append(node('span', 'chev', '›'));
@@ -527,13 +562,16 @@ function renderSession(session, columnCount) {
   dot.title = status;
   head.append(dot);
 
-  const name = node('span', 'card-name', session.name);
-  name.title = session.sessionId;
-  head.append(name);
+  const repo = repoLabel(session);
+  if (repo) {
+    const tag = node('span', 'repo', repo);
+    tag.title = session.cwd;
+    head.append(tag);
+  }
 
-  const meta = node('span', 'card-meta', shortPath(session.cwd));
-  meta.title = session.cwd;
-  head.append(meta);
+  const name = node('span', 'card-name', session.title || session.name);
+  name.title = `${session.title || session.name}\n${session.cwd}`;
+  head.append(name);
 
   if (session.pending.length) {
     head.append(node('span', 'badge hot', String(session.pending.length)));
@@ -544,6 +582,15 @@ function renderSession(session, columnCount) {
   } else {
     head.append(node('span', 'badge', session.status));
   }
+
+  const close = node('button', 'close-btn', '×');
+  close.title = 'Remove from the grid (stays in the sidebar)';
+  close.setAttribute('aria-label', 'Remove from grid');
+  close.addEventListener('click', (event) => {
+    event.stopPropagation();
+    dismiss(session);
+  });
+  head.append(close);
 
   card.append(head);
 
@@ -563,15 +610,18 @@ function renderSession(session, columnCount) {
     }
   }
 
-  const handle = node('div', 'resize');
-  handle.title = 'Drag to resize · double-click to reset';
-  handle.addEventListener('pointerdown', (event) => beginResize(event, card, session));
-  handle.addEventListener('dblclick', (event) => {
-    event.stopPropagation();
-    forgetSize(session.sessionId);
-    render();
-  });
-  card.append(handle);
+  // Nothing to size on a folded card.
+  if (expanded) {
+    const handle = node('div', 'resize');
+    handle.title = 'Drag to resize · double-click to reset';
+    handle.addEventListener('pointerdown', (event) => beginResize(event, card, session));
+    handle.addEventListener('dblclick', (event) => {
+      event.stopPropagation();
+      forgetSize(session.sessionId);
+      render();
+    });
+    card.append(handle);
+  }
 
   return card;
 }
@@ -583,13 +633,17 @@ function renderIdle(sessions) {
 
   for (const session of sessions) {
     const li = node('li', 'idle-item');
-    li.title = `${session.cwd}\nClick to open`;
-    li.addEventListener('click', () => toggle(session));
+    li.title = `${session.title || session.name}\n${session.cwd}\n\nClick to put it on the grid`;
+    li.addEventListener('click', () => openFromSidebar(session));
 
-    const dot = node('span', `dot ${session.status}`);
-    li.append(dot);
-    li.append(node('span', 'idle-name', session.name));
-    li.append(node('span', 'idle-cwd', shortPath(session.cwd)));
+    li.append(node('span', `dot ${session.status}`));
+
+    const text = node('span', 'idle-text');
+    const repo = repoLabel(session);
+    if (repo) text.append(node('span', 'idle-repo', repo));
+    text.append(node('span', 'idle-name', session.title || session.name));
+    li.append(text);
+
     el.idleList.append(li);
   }
 }
@@ -660,8 +714,8 @@ function render() {
   });
 
   const { count } = gridMetrics();
-  const open = state.sessions.filter(isExpanded);
-  const idle = state.sessions.filter((s) => !isExpanded(s));
+  const open = state.sessions.filter(onGrid);
+  const idle = state.sessions.filter((s) => !onGrid(s));
 
   el.sessions.replaceChildren();
 
