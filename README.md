@@ -36,8 +36,8 @@ compa start         # run the dashboard, opens http://127.0.0.1:4517
 `~/.claude/settings.json.compa-backup-<timestamp>` before touching it, and only
 adds its own hook entries — anything already in `hooks` is left alone.
 
-Sessions pick the hooks up when they start, so **restart any Claude Code sessions
-already running**.
+Claude Code re-reads its settings while running, so sessions you already have open
+generally start routing to the dashboard within seconds. If one doesn't, restart it.
 
 To remove it: `compa uninstall`.
 

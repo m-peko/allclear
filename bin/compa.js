@@ -110,7 +110,7 @@ function install() {
   console.log(`✓ compa hooks installed into ${SETTINGS_FILE}`);
   console.log('  PermissionRequest → approve or deny from the dashboard');
   console.log('  Notification, SessionEnd → status only');
-  console.log('\nRestart any running Claude Code sessions to pick the hooks up, then: compa start');
+  console.log('\nRunning sessions pick these up within seconds. Next: compa start');
 }
 
 function uninstall() {
