@@ -1032,8 +1032,39 @@ body.resizing {
     padding: 14px;
   }
 
+  /* One column, whatever width was remembered on a wider screen. Without the
+     override a saved `span 2` would conjure an implicit second column. */
+  .card,
   .card.expanded {
-    grid-column: span 1;
+    grid-column: span 1 !important;
+  }
+
+  /* The title is the one thing worth reading on a phone, and sharing a row with
+     the badges leaves it about forty pixels. Give it its own line. */
+  .card-head {
+    flex-wrap: wrap;
+    row-gap: 7px;
+  }
+
+  .card-name {
+    order: 10;
+    flex: 1 0 100%;
+    font-size: 14px;
+  }
+
+  .repo {
+    max-width: 55%;
+  }
+
+  /* Finger-sized rather than cursor-sized. */
+  .chev,
+  .close-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .btn-sm {
+    padding: 7px 12px;
   }
 
   .resize {

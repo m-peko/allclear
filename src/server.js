@@ -24,7 +24,29 @@ const MIME = {
   '.svg': 'image/svg+xml',
 };
 
-function createServer() {
+// Constant-time compare, so a token can't be guessed a character at a time.
+function sameToken(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
+function cookieValue(header, name) {
+  for (const part of String(header || '').split(';')) {
+    const [key, ...rest] = part.trim().split('=');
+    if (key === name) return decodeURIComponent(rest.join('='));
+  }
+  return null;
+}
+
+function isLoopback(req) {
+  const address = req.socket.remoteAddress || '';
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
+
+function createServer(options = {}) {
+  // Set only when listening beyond loopback. Approving a tool call runs a command
+  // on this machine, so reaching the port must not be enough to do it.
+  const TOKEN = options.token || null;
   /** @type {Map<string, any>} id -> held permission request */
   const pending = new Map();
   /** @type {Map<string, any>} sessionId -> session record from ~/.claude/sessions */
@@ -463,6 +485,36 @@ function createServer() {
     const url = new URL(req.url, 'http://localhost');
     const route = `${req.method} ${url.pathname}`;
 
+    if (url.pathname.startsWith('/hook/')) {
+      // Claude Code posts these from this machine. Accepting them from the
+      // network would let anyone who can reach the port fabricate requests.
+      if (!isLoopback(req)) {
+        res.writeHead(403, { 'content-type': 'text/plain' }).end('forbidden');
+        return;
+      }
+    } else if (TOKEN) {
+      const supplied =
+        url.searchParams.get('t') ||
+        cookieValue(req.headers.cookie, 'allclear') ||
+        req.headers['x-allclear-token'] ||
+        '';
+
+      if (!sameToken(supplied, TOKEN)) {
+        res.writeHead(401, { 'content-type': 'text/plain; charset=utf-8' });
+        res.end('allclear: this link needs its access token.\n');
+        return;
+      }
+
+      // Hand the token to the browser once, so links and reloads inside the page
+      // work without it trailing through every URL.
+      if (url.searchParams.get('t')) {
+        res.setHeader(
+          'set-cookie',
+          `allclear=${encodeURIComponent(TOKEN)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`
+        );
+      }
+    }
+
     try {
       switch (route) {
         case 'POST /hook/permission-request':
@@ -568,4 +620,4 @@ function createServer() {
   return server;
 }
 
-module.exports = { createServer, DEFAULT_PORT };
+module.exports = { createServer, DEFAULT_PORT, isLoopback };

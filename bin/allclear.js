@@ -193,6 +193,50 @@ function status() {
     .catch(() => console.log(`server:    not running on ${port} — run: allclear start`));
 }
 
+const TOKEN_FILE = path.join(path.dirname(SETTINGS_FILE), 'allclear-token');
+
+// Kept on disk so the phone's bookmark survives a restart.
+function readOrCreateToken() {
+  try {
+    const existing = fs.readFileSync(TOKEN_FILE, 'utf8').trim();
+    if (existing) return existing;
+  } catch {
+    /* first run */
+  }
+  const token = require('crypto').randomBytes(16).toString('base64url');
+  fs.mkdirSync(path.dirname(TOKEN_FILE), { recursive: true });
+  fs.writeFileSync(TOKEN_FILE, `${token}\n`, { mode: 0o600 });
+  return token;
+}
+
+function lanAddresses() {
+  const found = [];
+  for (const entries of Object.values(require('os').networkInterfaces())) {
+    for (const entry of entries || []) {
+      if (entry.family === 'IPv4' && !entry.internal) found.push(entry.address);
+    }
+  }
+  return found;
+}
+
+// A phone can't be asked to type a token by hand. Use qrencode when it's there.
+function showQr(url) {
+  try {
+    const { status } = require('child_process').spawnSync('qrencode', ['--version'], {
+      stdio: 'ignore',
+    });
+    if (status !== 0) return false;
+    const out = require('child_process').spawnSync('qrencode', ['-t', 'ANSIUTF8', '-m', '1', url], {
+      encoding: 'utf8',
+    });
+    if (out.status !== 0 || !out.stdout) return false;
+    process.stdout.write(`\n${out.stdout}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function openBrowser(url) {
   const opener =
     process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
@@ -204,7 +248,14 @@ function openBrowser(url) {
 }
 
 function start() {
-  const server = createServer();
+  // Loopback by default. --lan opens it to the network, which always carries a
+  // token: approving a tool call runs a command on this machine, so being able
+  // to reach the port must not be enough to do it.
+  const lan = flag('lan');
+  const token = lan ? readOrCreateToken() : null;
+  const host = lan ? '0.0.0.0' : '127.0.0.1';
+
+  const server = createServer({ token });
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
@@ -214,13 +265,29 @@ function start() {
     throw err;
   });
 
-  server.listen(port, '127.0.0.1', () => {
-    const url = `http://127.0.0.1:${port}`;
+  server.listen(port, host, () => {
+    const url = `http://127.0.0.1:${port}${token ? `/?t=${token}` : ''}`;
     const settings = readSettings();
     const installed = installedGroups(settings).length > 0;
     const hookPort = installedPort(settings);
 
     console.log(`allclear → ${url}`);
+
+    if (lan) {
+      const addresses = lanAddresses();
+      if (!addresses.length) {
+        console.log('  (no network address found — is this machine on a network?)');
+      }
+      for (const address of addresses) {
+        console.log(`          → http://${address}:${port}/?t=${token}`);
+      }
+      console.log('');
+      console.log('  Open that on your phone — it must be on the same network.');
+      console.log('  Anyone with this link can approve tool calls on this machine.');
+      console.log(`  The token lives in ${TOKEN_FILE}; delete it to issue a new one.`);
+      if (addresses.length && !flag('no-qr')) showQr(`http://${addresses[0]}:${port}/?t=${token}`);
+    }
+
     if (!installed) {
       console.log('⚠ hooks are not installed yet — run: allclear install');
     } else if (hookPort && hookPort !== port) {
@@ -250,6 +317,9 @@ if (!commands[command] || flag('help')) {
   allclear status       show hooks, live sessions and whether the server is up
   allclear uninstall    remove allclear's hooks
 
+  --lan              also serve on your local network, for a phone or tablet.
+                     Prints a link carrying an access token, and a QR code if
+                     qrencode is installed
   --port N           use a different port (default ${DEFAULT_PORT})
   --no-open          don't open a browser
 

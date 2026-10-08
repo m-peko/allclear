@@ -104,8 +104,40 @@ allclear had never been there.
 | `allclear status` | Show hooks, live sessions, and whether the server is up |
 | `allclear uninstall` | Remove the hooks |
 
-`--port N` runs on a different port — pass it to `install` as well, so the hooks
-point at the right place. `--no-open` skips opening a browser.
+`--lan` also serves it to your network, for a phone — see below. `--port N` runs
+on a different port; pass it to `install` as well, so the hooks point at the right
+place. `--no-open` skips opening a browser.
+
+## From your phone
+
+<img src="docs/mobile.png" align="right" width="230" alt="allclear on a phone">
+
+```bash
+allclear --lan
+```
+
+It prints a link for every address this machine has, and a QR code if you have
+`qrencode` installed. Open it on your phone and approve from the sofa.
+
+The layout collapses to a single column, card titles get a line of their own, and
+the controls are sized for thumbs.
+
+**This one needs care.** Approving a tool call runs a command on your machine, so
+a dashboard anyone on the café wifi can open is a remote shell with a nice UI. So:
+
+- The link carries a token, and every request without it is refused. The token is
+  generated once and kept in `~/.claude/allclear-token` (mode `600`) so a bookmark
+  keeps working; delete that file to invalidate it and issue a new one.
+- The hook endpoints only accept connections from this machine, so nothing on the
+  network can fabricate a permission request.
+- Without `--lan` the server binds to `127.0.0.1` and no token is involved at all.
+
+Treat the link like a password. If your machine is on a Tailscale or similar
+network, `--lan` will print that address too, which gets you to it from anywhere
+without exposing it to the local network you happen to be on.
+
+<br clear="right">
+
 
 ## Using it
 
@@ -217,9 +249,10 @@ terminal's "Yes, and don't ask again" does.
 
 ## Scope
 
-The server binds to `127.0.0.1` only. Anyone who can reach the port can approve
-tool calls on your machine, so don't move it to `0.0.0.0` or put it behind a
-tunnel without authentication in front of it.
+By default the server binds to `127.0.0.1` only. `--lan` opens it to the network
+and always requires a token — see [From your phone](#from-your-phone). Don't put
+it behind a public tunnel: the token is a reasonable guard on a home or office
+network, not on the open internet.
 
 Session discovery reads `/proc` on Linux and falls back to a signal probe
 elsewhere; the rest is platform-independent.
